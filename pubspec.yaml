@@ -1,0 +1,33 @@
+name: no_white_writer
+description: "不白写作 — 一个安静的纯文本写作工具（Flutter / Windows 优先，代码适配 macOS、Windows ARM、Linux、Android）。"
+publish_to: 'none'
+version: 0.4.0+4
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # 运行时依赖：path_provider / window_manager / fluent_ui 三个主依赖；
+  # material_ui 是 fluent_ui 的传递依赖，用于裸 TextField；
+  # screen_retriever 是 window_manager 的传递依赖，用于拿工作区做 R18 收敛。
+  path_provider: ^2.1.6
+  window_manager: ^0.5.2
+  fluent_ui: ^4.17.0
+  material_ui: ^1.8.0
+  screen_retriever: ^0.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/fonts/OFL-LXGWWenKai.txt
+  fonts:
+    - family: LXGWWenKaiGB
+      fonts:
+        - asset: assets/fonts/LXGWWenKaiGB-Regular.ttf
