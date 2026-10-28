@@ -5,6 +5,7 @@ import '../logging/app_logger.dart';
 import '../models.dart';
 import 'app_paths.dart';
 import 'atomic_file_writer.dart';
+import 'corrupt_file.dart';
 
 /// `library.json` 的读写（PLAN.md §4.1 / §4.7）。损坏时改名留存并返回空索引，
 /// 由上层用 `BookStore` 重建。
@@ -25,7 +26,7 @@ class LibraryStore {
       }
       return LibraryIndex.fromJson(decoded);
     } catch (error) {
-      await _keepCorrupt(file, 'library');
+      await keepCorrupt(file, 'library');
       AppLogger.instance.error('library.load.failed', <String, Object?>{
         'error': '$error',
       });
@@ -37,20 +38,6 @@ class LibraryStore {
     final String raw = const JsonEncoder.withIndent('  ')
         .convert(index.toJson());
     await _writer.writeAtomically(_paths.libraryFile, raw);
-  }
-
-  Future<void> _keepCorrupt(File file, String stem) async {
-    try {
-      final String suffix = DateTime.now().millisecondsSinceEpoch.toString();
-      await file.rename('${file.path}.corrupt-$suffix');
-      AppLogger.instance.warn('storage.corrupt.kept', <String, Object?>{
-        'file': file.path,
-        'backup': '${file.path}.corrupt-$suffix',
-        'stem': stem,
-      });
-    } catch (_) {
-      // 保存失败不阻断启动。
-    }
   }
 }
 

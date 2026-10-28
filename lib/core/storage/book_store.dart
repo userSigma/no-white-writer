@@ -9,6 +9,7 @@ import 'app_paths.dart';
 import 'atomic_file_writer.dart';
 import 'chapter_store.dart';
 import 'chapter_move_store.dart';
+import 'corrupt_file.dart';
 
 /// `book.json` 的读写与从磁盘重建索引（PLAN.md §4.7 第 1–4 步）。
 class BookStore {
@@ -40,7 +41,7 @@ class BookStore {
         }
         return book;
       } catch (error) {
-        await _keepCorrupt(file, summary.id);
+        await keepCorrupt(file, summary.id);
         AppLogger.instance.warn('book.load.failed', <String, Object?>{
           'book': summary.id,
           'error': '$error',
@@ -88,11 +89,8 @@ class BookStore {
           final File f = files[j];
           final String stem = fileNameOf(f.path);
           final String chapterId = stem.substring(0, stem.length - 4);
-          String text = '';
-          try {
-            text =
-                await _chapters.readText(summary.id, volumeId, chapterId) ?? '';
-          } catch (_) {}
+          final String text =
+              await _chapters.readText(summary.id, volumeId, chapterId) ?? '';
           volume.chapters.add(
             ChapterMeta(
               id: chapterId,
@@ -119,10 +117,8 @@ class BookStore {
   Future<void> refreshWordCounts(BookIndex book) async {
     for (final Volume volume in book.volumes) {
       for (final ChapterMeta chapter in volume.chapters) {
-        String text = '';
-        try {
-          text = await _chapters.readText(book.id, volume.id, chapter.id) ?? '';
-        } catch (_) {}
+        final String text =
+            await _chapters.readText(book.id, volume.id, chapter.id) ?? '';
         chapter.wordCount = countWords(text);
       }
     }
@@ -147,12 +143,5 @@ class BookStore {
       await dir.rename(target);
     }
     return target;
-  }
-
-  Future<void> _keepCorrupt(File file, String bookId) async {
-    try {
-      final String suffix = DateTime.now().millisecondsSinceEpoch.toString();
-      await file.rename('${file.path}.corrupt-$suffix');
-    } catch (_) {}
   }
 }

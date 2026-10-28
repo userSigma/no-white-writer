@@ -20,9 +20,10 @@ Future<String?> showContextMenu(
   if (actions.isEmpty) return Future<String?>.value();
   // 不做 InheritedTheme.capture：应用只有 app 级唯一 FluentTheme（无嵌套），
   // 路由内容经 Overlay 直接读取实时主题，主题切换时打开中的菜单立即重配色。
-  return Navigator.of(context, rootNavigator: true).push<String>(
-    _ContextRoute(position: position, actions: actions),
-  );
+  return Navigator.of(
+    context,
+    rootNavigator: true,
+  ).push<String>(_ContextRoute(position: position, actions: actions));
 }
 
 class _ContextRoute extends PopupRoute<String> {
@@ -42,35 +43,34 @@ class _ContextRoute extends PopupRoute<String> {
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
-  ) =>
-    LayoutBuilder(
-      builder: (context, box) {
-        final width = (box.maxWidth - 16).clamp(1.0, 220.0);
-        final height = (actions.length * 38.0 + 12).clamp(
-          1.0,
-          box.maxHeight - 16,
-        );
-        final x = position.dx.clamp(
-          8.0,
-          (box.maxWidth - width - 8).clamp(8.0, double.infinity),
-        );
-        final y = position.dy.clamp(
-          8.0,
-          (box.maxHeight - height - 8).clamp(8.0, double.infinity),
-        );
-        return Stack(
-          children: [
-            Positioned(
-              left: x,
-              top: y,
-              width: width,
-              height: height,
-              child: _Menu(actions: actions),
-            ),
-          ],
-        );
-      },
-    );
+  ) => LayoutBuilder(
+    builder: (context, box) {
+      final width = (box.maxWidth - 16).clamp(1.0, 220.0);
+      final height = (actions.length * 38.0 + 12).clamp(
+        1.0,
+        box.maxHeight - 16,
+      );
+      final x = position.dx.clamp(
+        8.0,
+        (box.maxWidth - width - 8).clamp(8.0, double.infinity),
+      );
+      final y = position.dy.clamp(
+        8.0,
+        (box.maxHeight - height - 8).clamp(8.0, double.infinity),
+      );
+      return Stack(
+        children: [
+          Positioned(
+            left: x,
+            top: y,
+            width: width,
+            height: height,
+            child: _Menu(actions: actions),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _Menu extends StatefulWidget {

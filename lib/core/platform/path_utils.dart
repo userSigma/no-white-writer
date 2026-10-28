@@ -42,8 +42,9 @@ String uniqueFileName(String base, Set<String> taken) {
   return candidate;
 }
 
+/// `Directory.create(recursive: true)` 幂等：已存在时正常返回，无需预检。
 Future<Directory> ensureDirectory(String path) async {
   final Directory dir = Directory(path);
-  if (!await dir.exists()) await dir.create(recursive: true);
+  await dir.create(recursive: true);
   return dir;
 }

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../core/chapter_numbering.dart';
 import '../core/models.dart';
+import '../core/text/composing.dart';
 import '../core/text/word_count.dart';
 import '../state/export_controller.dart';
 import '../state/workspace_controller.dart';
@@ -66,8 +67,7 @@ class _ChapterPaneState extends State<ChapterPane> {
   String? _editingId;
   String? _nameError;
   bool _savingName = false, _blurPending = false;
-  bool get _composing =>
-      _name.value.composing.isValid && !_name.value.composing.isCollapsed;
+  bool get _composing => isComposingValue(_name.value);
   @override
   void initState() {
     super.initState();
@@ -366,24 +366,24 @@ class _ChapterPaneState extends State<ChapterPane> {
             ],
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Tooltip(
-                    message: '新建章节',
-                    child: Semantics(
-                      label: '新建章节',
-                      button: true,
-                      child: IconButton(
-                        key: ValueKey('add-chapter-${volume.id}'),
-                        icon: const Icon(FluentIcons.add),
-                        onPressed:
-                            w.editingLocked || w.moving || _editingId != null
-                            ? null
-                            : () => _appendChapter(volume),
-                      ),
+              child: Align(
+                alignment: Alignment.center,
+                child: Tooltip(
+                  message: '新建章节',
+                  child: Semantics(
+                    label: '新建章节',
+                    button: true,
+                    child: IconButton(
+                      key: ValueKey('add-chapter-${volume.id}'),
+                      icon: const Icon(FluentIcons.add),
+                      onPressed:
+                          w.editingLocked || w.moving || _editingId != null
+                          ? null
+                          : () => _appendChapter(volume),
                     ),
                   ),
                 ),
+              ),
             ),
           ],
         ],
@@ -898,9 +898,7 @@ class _NameDialogState extends State<_NameDialog> {
   late final controller = TextEditingController(text: widget.initial);
   bool _saving = false;
   String? _error;
-  bool get composing =>
-      controller.value.composing.isValid &&
-      !controller.value.composing.isCollapsed;
+  bool get composing => isComposingValue(controller.value);
   @override
   void initState() {
     super.initState();

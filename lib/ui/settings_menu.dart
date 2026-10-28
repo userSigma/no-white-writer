@@ -7,9 +7,9 @@ import 'package:flutter/services.dart';
 
 import '../app_context.dart';
 import '../core/models.dart';
+import '../core/text/composing.dart';
 import '../state/settings_controller.dart';
 import 'menu_surface.dart';
-import 'theme/live_theme_scope.dart';
 import 'theme/tokens.dart';
 
 /// A reusable anchor: the shelf opens downward and the sidebar footer upward.
@@ -119,8 +119,7 @@ class _SettingsMenuState extends State<_SettingsMenu> {
   String? _message;
   bool _messageError = false;
   AppContext get app => widget.app;
-  bool get _composing =>
-      _path.value.composing.isValid && !_path.value.composing.isCollapsed;
+  bool get _composing => isComposingValue(_path.value);
   bool get _dirty =>
       _path.text.trim() != (app.settings.settings.exportDirectory ?? '');
 
@@ -461,9 +460,8 @@ class _SettingsMenuState extends State<_SettingsMenu> {
               _sub(
                 '管理自定义主题',
                 () => <MenuFlyoutItemBase>[
-                  for (final CustomTheme theme in settings.customThemes) ...<
-                    MenuFlyoutItemBase
-                  >[
+                  for (final CustomTheme theme
+                      in settings.customThemes) ...<MenuFlyoutItemBase>[
                     _action(
                       '重命名「${theme.name}」…',
                       () => unawaited(_renameCustomTheme(theme)),
@@ -637,12 +635,8 @@ Color? _parseHexColor(String input) {
   return Color(0xFF000000 | value);
 }
 
-String _colorHex(Color c) => c
-    .toARGB32()
-    .toRadixString(16)
-    .padLeft(8, '0')
-    .substring(2)
-    .toUpperCase();
+String _colorHex(Color c) =>
+    c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase();
 
 /// 新建自定义主题：背景色 + 提示颜色（色板 + HEX 输入）+ 可选命名 + 实时预览。
 class _CustomThemeDialog extends StatefulWidget {
@@ -718,10 +712,7 @@ class _CustomThemeDialogState extends State<_CustomThemeDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              TextBox(
-                controller: _name,
-                placeholder: '主题名称（留空自动编号，如「自定义主题1」）',
-              ),
+              TextBox(controller: _name, placeholder: '主题名称（留空自动编号，如「自定义主题1」）'),
               const SizedBox(height: 14),
               _ColorField(
                 label: '背景颜色',
@@ -743,10 +734,7 @@ class _CustomThemeDialogState extends State<_CustomThemeDialog> {
         ),
       ),
       actions: <Widget>[
-        Button(
-          onPressed: Navigator.of(context).pop,
-          child: const Text('取消'),
-        ),
+        Button(onPressed: Navigator.of(context).pop, child: const Text('取消')),
         FilledButton(
           onPressed: () {
             Navigator.of(context).pop(
@@ -822,7 +810,7 @@ class _ColorFieldState extends State<_ColorField> {
   @override
   Widget build(BuildContext context) {
     final Color stroke = hairlineColor(context);
-    final Color labelColor = bodyTextColorLive(context);
+    final Color labelColor = bodyTextColor(context);
     final bool invalid =
         _hex.text.trim().isNotEmpty && _parseHexColor(_hex.text) == null;
     return Column(
@@ -848,21 +836,20 @@ class _ColorFieldState extends State<_ColorField> {
                       width: c == widget.selected ? 2 : 1,
                     ),
                   ),
-                  child:
-                      c == widget.selected
-                          ? Center(
-                            child: Text(
-                              '✓',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: c.computeLuminance() >= 0.5
-                                    ? Colors.black
-                                    : Colors.white,
-                              ),
+                  child: c == widget.selected
+                      ? Center(
+                          child: Text(
+                            '✓',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: c.computeLuminance() >= 0.5
+                                  ? Colors.black
+                                  : Colors.white,
                             ),
-                          )
-                          : null,
+                          ),
+                        )
+                      : null,
                 ),
               ),
           ],
@@ -980,15 +967,11 @@ class _RenameThemeDialogState extends State<_RenameThemeDialog> {
       title: const Text('重命名自定义主题'),
       content: TextBox(controller: _controller, autofocus: true),
       actions: <Widget>[
-        Button(
-          onPressed: Navigator.of(context).pop,
-          child: const Text('取消'),
-        ),
+        Button(onPressed: Navigator.of(context).pop, child: const Text('取消')),
         FilledButton(
-          onPressed:
-              _controller.text.trim().isEmpty
-                  ? null
-                  : () => Navigator.of(context).pop(_controller.text.trim()),
+          onPressed: _controller.text.trim().isEmpty
+              ? null
+              : () => Navigator.of(context).pop(_controller.text.trim()),
           child: const Text('确定'),
         ),
       ],

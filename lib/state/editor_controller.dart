@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart'
-    show TextEditingValue, TextRange, TextSelection;
+import 'package:flutter/services.dart' show TextEditingValue, TextSelection;
 import 'package:flutter/widgets.dart' show TextEditingController;
 
 import '../core/chapter_numbering.dart';
@@ -12,6 +11,7 @@ import '../core/models.dart';
 import '../core/storage/book_store.dart';
 import '../core/storage/chapter_store.dart';
 import '../core/storage/export_service.dart';
+import '../core/text/composing.dart';
 import '../core/text/indenting_controller.dart';
 import '../core/text/word_count.dart';
 import 'library_controller.dart';
@@ -309,11 +309,10 @@ class EditorController extends ChangeNotifier {
 
   bool get isComposing => _isComposing;
 
-  bool get _isComposing =>
-      <TextEditingController>[_text, _title].any((TextEditingController c) {
-        final TextRange range = c.value.composing;
-        return range.isValid && !range.isCollapsed;
-      });
+  bool get _isComposing => <TextEditingController>[
+    _text,
+    _title,
+  ].any((TextEditingController c) => isComposingValue(c.value));
 
   Future<void> saveNow({bool force = false}) async {
     await _opening;
