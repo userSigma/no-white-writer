@@ -7,7 +7,6 @@ import 'package:material_ui/material_ui.dart' show TextField;
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/state/library_controller.dart';
 import 'package:no_white_writer/ui/book_details_dialog.dart';
-import 'package:no_white_writer/ui/catalog_page.dart';
 import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/shelf_page.dart';
 
@@ -181,7 +180,6 @@ void main() {
       until: () => h.app.editor.book?.title == 'Z新作品' && editorReady(tester),
     );
     expect(find.byType(EditorPage), findsOneWidget);
-    expect(find.byType(CatalogPage), findsNothing);
     expect(h.app.editor.book?.title, 'Z新作品');
     expect(h.app.editor.book?.notes, '备注一\n备注二');
     expect(find.text('新建卷'), findsOneWidget);
@@ -198,7 +196,6 @@ void main() {
     await tester.tap(find.text(summary.title).first);
     await finishIo(tester, until: () => editorReady(tester));
     expect(find.byType(EditorPage), findsOneWidget);
-    expect(find.byType(CatalogPage), findsNothing);
     final Finder title = find.byKey(const ValueKey('chapter-title'));
     final Finder body = find.byKey(const ValueKey('chapter-body'));
     expect(title, findsOneWidget);

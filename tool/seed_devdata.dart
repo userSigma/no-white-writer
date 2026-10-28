@@ -14,8 +14,7 @@ Future<void> main() async {
   final Directory repo = Directory.current;
   final Directory dataRoot = Directory('${repo.path}\\.devdata');
   final Directory docsRoot = Directory('${repo.path}\\.devdata-docs');
-  final AppPaths paths =
-      AppPaths(dataRoot: dataRoot, documentsRoot: docsRoot);
+  final AppPaths paths = AppPaths(dataRoot: dataRoot, documentsRoot: docsRoot);
   await paths.ensureLayout();
   await AppLogger.instance.init(Directory(paths.logsDir));
 
@@ -52,27 +51,31 @@ Future<void> main() async {
     }
     book.volumes.add(volume);
     await books.save(book);
-    library.books.add(BookSummary(
-      id: bookId,
-      title: title,
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
-      updatedAt: DateTime.now().subtract(const Duration(minutes: 20)),
-      coverSeed: title.hashCode,
-      lastOpenedChapterId: volume.chapters.first.id,
-      volumeCount: book.volumes.length,
-      chapterCount: book.allChapters.length,
-      wordCount: book.totalWordCount,
-    ));
+    library.books.add(
+      BookSummary(
+        id: bookId,
+        title: title,
+        createdAt: DateTime.now().subtract(const Duration(days: 3)),
+        updatedAt: DateTime.now().subtract(const Duration(minutes: 20)),
+        coverSeed: title.hashCode,
+        lastOpenedChapterId: volume.chapters.first.id,
+        volumeCount: book.volumes.length,
+        chapterCount: book.allChapters.length,
+        wordCount: book.totalWordCount,
+      ),
+    );
     stdout.writeln('seeded $title (${book.allChapters.length} chapters)');
   }
 
-  const String p1 = '　　'
+  const String p1 =
+      '　　'
       '雨落在旧城的瓦上，声音像有人在数铜钱。沈砚把窗推开一条缝，让潮气进来，'
       '桌上的稿纸被风掀起一角。\n'
       '　　他按住纸，继续写昨天没写完的那一段：一个人如果连自己的名字都记不清，'
       '还剩下什么可以交出去？\n'
       '　　楼下卖馄饨的摊子刚支起来，白汽在巷口散成一团。';
-  const String p2 = '　　'
+  const String p2 =
+      '　　'
       '第二日天没亮，邮差送来一封没有署名的信。信封里只有半张地图，'
       '角上画着一只闭眼的鸟。\n'
       '　　沈砚把地图摊在灯下，发现背面用很淡的墨写着一行小字：'
@@ -81,10 +84,7 @@ Future<void> main() async {
   await seedBook(
     title: '旧城记',
     volumeTitle: '第一卷 · 雨巷',
-    chapterList: <(String, String)>[
-      ('第一章 数铜钱的人', p1),
-      ('第二章 闭眼的鸟', p2),
-    ],
+    chapterList: <(String, String)>[('第一章 数铜钱的人', p1), ('第二章 闭眼的鸟', p2)],
   );
   await seedBook(
     title: '白夜抄',
@@ -94,7 +94,7 @@ Future<void> main() async {
         '第一章 灯下',
         '　　'
             '灯芯爆了一下，屋里亮了一瞬。她把针线放下，听见院墙外有脚步声经过，'
-            '不快不慢，像在丈量这条巷子的长度。'
+            '不快不慢，像在丈量这条巷子的长度。',
       ),
     ],
   );

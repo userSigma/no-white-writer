@@ -100,8 +100,30 @@ class ExportSnapshotStore {
   }
 
   Future<BookIndex> readBook(String bookId) async {
+    final session = await openSession(bookId);
+    return session.readBook();
+  }
+
+  Future<String> readChapter(
+    String bookId,
+    String volumeId,
+    String chapterId,
+  ) async {
     _checkId(bookId);
     await _checkBookConflicts(bookId);
+    return _readChapter(bookId, volumeId, chapterId);
+  }
+
+  /// 打开单本书的导出会话：书级冲突（目录结构、未解决的迁移记录与临时文件）
+  /// 只在这里验证一次；会话内的后续读取不再重复，整本导出不再产生章数级
+  /// 重复 stat 调用。导出期间的书级一致性由 `beginExport` 写屏障保证。
+  Future<ExportBookSession> openSession(String bookId) async {
+    _checkId(bookId);
+    await _checkBookConflicts(bookId);
+    return ExportBookSession._(this, bookId);
+  }
+
+  Future<BookIndex> _parseBook(String bookId) async {
     final file = paths.bookFile(bookId);
     await _requireType(file.path, FileSystemEntityType.file);
     final data = _object(jsonDecode(_decode(await _readBytes(file))));
@@ -128,15 +150,13 @@ class ExportSnapshotStore {
     }
   }
 
-  Future<String> readChapter(
+  Future<String> _readChapter(
     String bookId,
     String volumeId,
     String chapterId,
   ) async {
-    _checkId(bookId);
     _checkId(volumeId);
     _checkId(chapterId);
-    await _checkBookConflicts(bookId);
     for (final path in [
       paths.volumesDir(bookId),
       paths.volumeDir(bookId, volumeId),
@@ -163,4 +183,17 @@ class ExportSnapshotStore {
         .replaceAll('\r\n', '\n')
         .replaceAll('\r', '\n');
   }
+}
+
+/// 已通过书级冲突检查的导出会话：章读取只验证卷/章级文件状态。
+class ExportBookSession {
+  ExportBookSession._(this._store, this.bookId);
+
+  final ExportSnapshotStore _store;
+  final String bookId;
+
+  Future<BookIndex> readBook() => _store._parseBook(bookId);
+
+  Future<String> readChapter(String volumeId, String chapterId) =>
+      _store._readChapter(bookId, volumeId, chapterId);
 }

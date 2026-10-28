@@ -561,9 +561,9 @@ class _EditorPageState extends State<EditorPage> {
                                 fontWeight: FontWeight.w600,
                                 color: bodyTextColor(context),
                               ),
-                                cursorColor: accentColor(context),
-                                decoration: InputDecoration.collapsed(
-                                  hintText: '输入章节标题…',
+                              cursorColor: accentColor(context),
+                              decoration: InputDecoration.collapsed(
+                                hintText: '输入章节标题…',
                                 hintStyle: TextStyle(
                                   color: mutedTextColor(context),
                                 ),

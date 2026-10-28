@@ -58,10 +58,15 @@ class ChapterNumbering {
     }
   }
 
+  /// 章显示号。规则本身（范围/单行/样式）由保存对话框与严格导出读取器经
+  /// [validate] 校验，这里不逐调用重跑；只保留随章数变化的边界检查：
+  /// 负索引与序列溢出（numbering_test 钉死的行为）。
   String label(int index) {
     if (index < 0) throw const FormatException('章节不在此卷中。');
-    validate(index + 1);
     final int value = start + index * step;
+    if (value > maxValue) {
+      throw const FormatException('章节编号超出 999999999，请调整起始值或步长。');
+    }
     final String digits = style == 'chinese'
         ? _chinese(value)
         : '$value'.padLeft(padding, '0');

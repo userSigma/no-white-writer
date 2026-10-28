@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'app_paths.dart';
 import 'atomic_file_writer.dart';
+import 'bytes.dart';
 
 /// 单书内跨卷迁移；恢复先于普通章节缺失恢复与索引重建。
 class ChapterMoveStore {
@@ -193,11 +194,8 @@ class ChapterMoveStore {
 
   Future<void> _verify(File file, List<int> expected) async {
     final actual = await file.readAsBytes();
-    if (actual.length != expected.length) {
+    if (!bytesEqual(actual, expected)) {
       throw StateError('字节校验失败：${file.path}');
-    }
-    for (int i = 0; i < actual.length; i++) {
-      if (actual[i] != expected[i]) throw StateError('字节校验失败：${file.path}');
     }
   }
 }
