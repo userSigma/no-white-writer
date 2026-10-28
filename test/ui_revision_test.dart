@@ -182,7 +182,14 @@ void main() {
     expect(find.byType(EditorPage), findsOneWidget);
     expect(h.app.editor.book?.title, 'Z新作品');
     expect(h.app.editor.book?.notes, '备注一\n备注二');
+    // 新建卷入口已并入书名右侧菜单，不再单独占位。
+    expect(find.text('新建卷'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('book-menu-button')));
+    await tester.pumpAndSettle();
     expect(find.text('新建卷'), findsOneWidget);
+    expect(find.text('自动章节序号设置'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await finishPage(tester, h);
   });
@@ -213,7 +220,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const ValueKey('open-chapter-pane')));
     await tester.pumpAndSettle();
-    expect(find.text('新建卷'), findsOneWidget);
+    // 新建卷入口已并入书名右侧菜单，窄屏仍可达。
+    expect(find.text('新建卷'), findsNothing);
+    expect(find.byKey(const ValueKey('book-menu-button')), findsOneWidget);
     expect(find.text('作品信息'), findsNothing);
     await tester.tap(
       find.byKey(ValueKey('toggle-volume-${h.app.editor.volume!.id}')),
@@ -281,7 +290,9 @@ void main() {
       }
 
       await openPane();
-      await tapVisible(find.text('新建卷'));
+      await tapVisible(find.byKey(const ValueKey('book-menu-button')));
+      await tester.tap(find.text('新建卷'));
+      await tester.pump(const Duration(milliseconds: 250));
       await nameDialog('第二卷');
       await finishIo(
         tester,

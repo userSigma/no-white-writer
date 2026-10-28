@@ -61,7 +61,7 @@ void main() {
   });
 
   for (final b in Brightness.values) {
-    testWidgets('设置选单保留 0.2 朱砂与 Fluent 通知，仅内容底色纯白纯黑：$b', (tester) async {
+    testWidgets('设置浮窗保留 0.2 朱砂与 Fluent 通知，仅内容底色纯白纯黑：$b', (tester) async {
       final h = await widgetHarness(tester);
       h.app.settings.setThemeMode(b == Brightness.light ? 'light' : 'dark');
       await tester.pumpWidget(NoWhiteWriterApp(app: h.app));
@@ -78,20 +78,18 @@ void main() {
       );
       expect(FluentTheme.of(context).scaffoldBackgroundColor, bg);
       expect(paperOrInk(context), bg);
-      await tester.tap(find.text('关于'));
-      await finishIo(tester);
+      // 关于区随浮窗直接可见；主题选项在 ComboBox 弹层里展开。
       expect(find.text('不白写作 0.4.0'), findsOneWidget);
-      await tester.tap(find.text('主题'));
+      await tester.tap(find.byKey(const ValueKey('settings-theme')));
       await finishIo(tester);
-      expect(find.text('浅色（纯白）'), findsOneWidget);
-      expect(find.text('深色（纯黑）'), findsOneWidget);
+      // ComboBox 弹层同时渲染选中项与下拉项，标签会出现两处。
+      expect(find.text('浅色（纯白）'), findsWidgets);
+      expect(find.text('深色（纯黑）'), findsWidgets);
       final headings = tester
           .widgetList<Text>(find.byType(Text))
           .where((t) => t.style?.color == const Color(0xFFA6402B));
       expect(headings, isNotEmpty, reason: '0.2 的设置标题为朱砂，而非强制黑白');
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await finishIo(tester);
-      await tester.tap(find.text('导出目录…'));
       await finishIo(tester);
       await tester.tap(find.text('保存'));
       await finishIo(

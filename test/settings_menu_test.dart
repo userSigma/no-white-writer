@@ -101,7 +101,7 @@ void main() {
 
   for (final width in [1280.0, 900.0]) {
     for (final editor in [false, true]) {
-      testWidgets('真实设置入口使用选单而非页面 $width editor=$editor', (tester) async {
+      testWidgets('真实设置入口打开设置浮窗而非页面 $width editor=$editor', (tester) async {
         final h = await widgetHarness(tester, width: width);
         Widget home = ShelfPage(app: h.app);
         if (editor) {
@@ -127,7 +127,7 @@ void main() {
     }
   }
 
-  testWidgets('验收入口自动弹出同一设置选单，不出现旧设置页面', (tester) async {
+  testWidgets('验收入口自动弹出同一设置浮窗，不出现旧设置页面', (tester) async {
     final h = await widgetHarness(tester);
     await tester.pumpWidget(
       FluentApp(home: ShelfPage(app: h.app, autoOpenSettings: true)),
@@ -138,48 +138,44 @@ void main() {
           find.byKey(const ValueKey('settings-menu')).evaluate().isNotEmpty,
     );
     expect(find.byKey(const ValueKey('settings-menu')), findsOneWidget);
-    expect(find.text('关于'), findsOneWidget);
+    expect(find.text('不白写作 0.4.0'), findsOneWidget);
     await finishWidget(tester, h);
   });
 
-  testWidgets('设置选单改主题、字号、行距、缩进与空行，关闭后落盘并可重开读取', (tester) async {
+  testWidgets('设置浮窗改主题、字号、行距、缩进与空行，关闭后落盘并可重开读取', (tester) async {
     final h = await widgetHarness(tester);
     await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
     await _openSettings(tester);
 
-    await tester.tap(find.text('主题'));
+    await tester.tap(find.byKey(const ValueKey('settings-theme')));
     await finishIo(tester);
     await tester.tap(find.text('深色（纯黑）'));
     await finishIo(tester);
     expect(h.app.settings.themeMode, 'dark');
 
-    await tester.tap(find.text('字号'));
+    await tester.tap(find.byKey(const ValueKey('settings-font-size')));
     await finishIo(tester);
     await tester.tap(find.text('20'));
     await finishIo(tester);
     expect(h.app.settings.settings.fontSize, 20);
 
-    await tester.tap(find.text('行距'));
+    await tester.tap(find.byKey(const ValueKey('settings-line-height')));
     await finishIo(tester);
     await tester.tap(find.text('2.0'));
     await finishIo(tester);
     expect(h.app.settings.settings.lineHeight, 2.0);
 
-    await tester.tap(find.text('自动首行缩进'));
+    await tester.tap(find.byKey(const ValueKey('settings-auto-indent')));
     await finishIo(tester);
     expect(h.app.settings.settings.autoIndent, isTrue);
 
-    await tester.tap(find.text('段间空行'));
+    await tester.tap(find.byKey(const ValueKey('settings-blank-line')));
     await finishIo(tester);
     expect(h.app.settings.settings.blankLineBetween, isTrue);
 
-    // The last opened submenu may still be on screen; Esc closes the deepest
-    // layer first, so keep pressing until the root menu is gone.
-    for (var attempt = 0; attempt < 3; attempt++) {
-      if (find.byKey(const ValueKey('settings-menu')).evaluate().isEmpty) break;
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await finishIo(tester);
-    }
+    // ComboBox 弹层关闭后，Esc 直接关闭设置浮窗。
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await finishIo(tester);
     expect(find.byKey(const ValueKey('settings-menu')), findsNothing);
     await tester.runAsync(() => h.app.settings.flush());
     final saved = (await tester.runAsync(() => h.app.settingsStore.load()))!;
@@ -194,33 +190,11 @@ void main() {
     await finishWidget(tester, h);
   });
 
-  testWidgets('设置选单容器与所有子选单都无描边，仅保留悬停底色和焦点描边', (tester) async {
+  testWidgets('ComboBox 弹层按 Esc 先关闭弹层，再按 Esc 才关闭设置浮窗', (tester) async {
     final h = await widgetHarness(tester);
     await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
     await _openSettings(tester);
-    await tester.tap(find.text('主题'));
-    await finishIo(tester);
-    final menus = tester
-        .widgetList<MenuFlyout>(find.byType(MenuFlyout))
-        .toList();
-    expect(menus.length, greaterThanOrEqualTo(2));
-    for (final menu in menus) {
-      final shape = menu.shape;
-      expect(shape, isA<RoundedRectangleBorder>());
-      expect((shape! as RoundedRectangleBorder).side.width, 0);
-    }
-    // Cycling focus must still be visible through the framework's own focus ring.
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    await finishWidget(tester, h);
-  });
-
-  testWidgets('子选单按 Esc 先关闭子选单，再按 Esc 才关闭整个设置选单', (tester) async {
-    final h = await widgetHarness(tester);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
-    await _openSettings(tester);
-    await tester.tap(find.text('主题'));
+    await tester.tap(find.byKey(const ValueKey('settings-theme')));
     await finishIo(tester);
     expect(find.text('浅色（纯白）'), findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -233,49 +207,23 @@ void main() {
     await finishWidget(tester, h);
   });
 
-  testWidgets('子选单表面随主题实时换色：无冻结显式色、无亚克力混合，切换后内容仍可读', (tester) async {
+  testWidgets('设置浮窗表面随主题实时换色，切换后内容仍可读', (tester) async {
     final h = await widgetHarness(tester);
     await tester.pumpWidget(NoWhiteWriterApp(app: h.app));
     await finishIo(tester);
     await _openSettings(tester);
-    await tester.tap(find.text('主题'));
-    await finishIo(tester);
-    expect(find.text('浅色（纯白）'), findsOneWidget);
-
-    void expectLiveSurfaces() {
-      final contents = tester
-          .widgetList<FlyoutContent>(find.byType(FlyoutContent))
-          .toList();
-      expect(contents.length, greaterThanOrEqualTo(2));
-      for (final content in contents) {
-        // 显式 color 会被 fluent_ui 的 MenuFlyoutSubItem.show() 捕获进闭包
-        // 且之后不再刷新——必须留 null，让表面走 FluentTheme.menuColor
-        // 实时查表（回归：子菜单主题冻结）。
-        expect(content.color, isNull);
-        // 亚克力路径会给表面叠 0.65 透明度并混入噪声；禁用后走实心
-        // acrylicFallbackColor（= 主题背景，见 buildFluentTheme）。
-        expect(content.useAcrylic, isFalse);
-      }
-    }
-
-    expectLiveSurfaces();
+    // 打开期间切换主题：浮窗所在 FluentTheme 的菜单色必须即时跟随。
     expect(
       FluentTheme.of(
         tester.element(find.byKey(const ValueKey('settings-menu'))),
       ).menuColor,
       AppColors.paper,
     );
-
-    // 主题切换发生在选单/子选单打开期间：表面必须即时跟随，内容保持可读。
+    await tester.tap(find.byKey(const ValueKey('settings-theme')));
+    await finishIo(tester);
     await tester.tap(find.text('深色（纯黑）'));
     await finishIo(tester);
     expect(h.app.settings.themeMode, 'dark');
-    if (find.text('浅色（纯白）').evaluate().isEmpty) {
-      await tester.tap(find.text('主题'));
-      await finishIo(tester);
-    }
-    expect(find.text('浅色（纯白）'), findsOneWidget);
-    expectLiveSurfaces();
     expect(
       FluentTheme.of(
         tester.element(find.byKey(const ValueKey('settings-menu'))),
@@ -285,12 +233,10 @@ void main() {
     await finishWidget(tester, h);
   });
 
-  testWidgets('导出目录草稿未保存时关闭选单需要确认，继续编辑保留草稿，丢弃后才关闭', (tester) async {
+  testWidgets('导出目录草稿未保存时关闭浮窗需要确认，继续编辑保留草稿，丢弃后才关闭', (tester) async {
     final h = await widgetHarness(tester);
     await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
     await _openSettings(tester);
-    await tester.tap(find.text('导出目录…'));
-    await finishIo(tester);
     final box = find.byKey(const ValueKey('settings-export-path'));
     await tester.enterText(box, 'D:/草稿目录');
     await tester.pump();
@@ -312,13 +258,11 @@ void main() {
     await finishWidget(tester, h);
   });
 
-  testWidgets('设置保存失败时选单保留草稿并显示重试，重试成功后清除错误', (tester) async {
+  testWidgets('设置保存失败时浮窗保留草稿并显示重试，重试成功后清除错误', (tester) async {
     final writer = _SettingsWriter();
     final h = await widgetHarness(tester, writer: writer);
     await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
     await _openSettings(tester);
-    await tester.tap(find.text('导出目录…'));
-    await finishIo(tester);
     await tester.enterText(
       find.byKey(const ValueKey('settings-export-path')),
       'E:/保存失败',
@@ -345,6 +289,8 @@ void main() {
     );
     expect(h.app.settings.settings.exportDirectory, isNull);
     writer.fail = false;
+    await tester.ensureVisible(find.text('重试保存'));
+    await tester.pump();
     await tester.tap(find.text('重试保存'));
     await finishIo(tester);
     expect(find.textContaining('设置保存失败'), findsNothing);
@@ -355,13 +301,11 @@ void main() {
     await finishWidget(tester, h);
   });
 
-  testWidgets('导出目录输入法组词中不能保存或关闭选单，组词结束后恢复', (tester) async {
+  testWidgets('导出目录输入法组词中不能保存或关闭浮窗，组词结束后恢复', (tester) async {
     final writer = _SettingsWriter();
     final h = await widgetHarness(tester, writer: writer);
     await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
     await _openSettings(tester);
-    await tester.tap(find.text('导出目录…'));
-    await finishIo(tester);
     final box = find.byKey(const ValueKey('settings-export-path'));
     await tester.tap(box);
     await tester.pump();
@@ -399,8 +343,6 @@ void main() {
     final h = await widgetHarness(tester, writer: writer);
     await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
     await _openSettings(tester);
-    await tester.tap(find.text('导出目录…'));
-    await finishIo(tester);
     final field = find.byKey(const ValueKey('settings-export-path'));
     await tester.tap(field);
     const draft = TextEditingValue(
