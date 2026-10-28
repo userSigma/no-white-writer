@@ -62,8 +62,12 @@ class ExportController extends ChangeNotifier {
           if (library.blockedBooks.contains(target.bookId)) {
             throw StateError('作品迁移待恢复，已停止导出。');
           }
-          final book = await reader.readBook(target.bookId);
+          // 书级冲突检查只在 openSession 做一次；整本导出时逐章读取
+          // 不再重复 stat 书目录与迁移记录探针。
+          final session = await reader.openSession(target.bookId);
+          final book = await session.readBook();
           result = await _writeTarget(
+            session,
             target,
             book,
             settings.settings.exportDirectory,
@@ -85,18 +89,19 @@ class ExportController extends ChangeNotifier {
   }
 
   Future<List<({String title, String text})>> _readVolume(
-    String bookId,
+    ExportBookSession session,
     Volume volume,
   ) async {
     final chapters = <({String title, String text})>[];
     for (final chapter in volume.chapters) {
-      final text = await reader.readChapter(bookId, volume.id, chapter.id);
+      final text = await session.readChapter(volume.id, chapter.id);
       chapters.add((title: displayChapterTitle(volume, chapter), text: text));
     }
     return chapters;
   }
 
   Future<File?> _writeTarget(
+    ExportBookSession session,
     ExportTarget target,
     BookIndex book,
     String? customDir,
@@ -107,7 +112,7 @@ class ExportController extends ChangeNotifier {
         final chapter = volume.chapters.firstWhere(
           (c) => c.id == target.chapterId,
         );
-        final text = await reader.readChapter(book.id, volume.id, chapter.id);
+        final text = await session.readChapter(volume.id, chapter.id);
         return service.exportChapter(
           bookTitle: book.title,
           volumeTitle: displayVolumeTitle(volume),
@@ -118,7 +123,7 @@ class ExportController extends ChangeNotifier {
       case ExportScope.volume:
         final volume = book.volumes.firstWhere((v) => v.id == target.volumeId);
         if (volume.chapters.isEmpty) return null;
-        final chapters = await _readVolume(book.id, volume);
+        final chapters = await _readVolume(session, volume);
         return service.exportVolume(
           bookTitle: book.title,
           volumeTitle: displayVolumeTitle(volume),
@@ -137,7 +142,7 @@ class ExportController extends ChangeNotifier {
         for (final volume in book.volumes) {
           volumes.add((
             volumeTitle: displayVolumeTitle(volume),
-            chapters: await _readVolume(book.id, volume),
+            chapters: await _readVolume(session, volume),
           ));
         }
         return service.exportBook(

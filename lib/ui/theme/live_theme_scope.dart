@@ -27,16 +27,16 @@ class LiveFluentThemeScope extends InheritedWidget {
 
   /// 读取实时 FluentThemeData。未注入时退回 [FluentTheme.of]。
   static FluentThemeData of(BuildContext context) {
-    final LiveFluentThemeScope? scope =
-        context.dependOnInheritedWidgetOfExactType<LiveFluentThemeScope>();
+    final LiveFluentThemeScope? scope = context
+        .dependOnInheritedWidgetOfExactType<LiveFluentThemeScope>();
     if (scope != null) return scope.themeData;
     return FluentTheme.of(context);
   }
 
   /// 读取实时主题模型。未注入时按 [FluentTheme] 明暗回退内置主题。
   static AppThemeData appThemeOf(BuildContext context) {
-    final LiveFluentThemeScope? scope =
-        context.dependOnInheritedWidgetOfExactType<LiveFluentThemeScope>();
+    final LiveFluentThemeScope? scope = context
+        .dependOnInheritedWidgetOfExactType<LiveFluentThemeScope>();
     if (scope != null) return scope.appTheme;
     return AppThemeData.builtinFor(FluentTheme.of(context).brightness);
   }
@@ -45,12 +45,3 @@ class LiveFluentThemeScope extends InheritedWidget {
   bool updateShouldNotify(LiveFluentThemeScope oldWidget) =>
       themeData != oldWidget.themeData || appTheme != oldWidget.appTheme;
 }
-
-/// 与 tokens.dart 的 paperOrInk 等价，但从 [LiveFluentThemeScope] 解析，
-/// 供 flyout / 子菜单表面使用：即使路由内的 FluentTheme 被冻结也能实时换色。
-Color paperOrInkLive(BuildContext context) =>
-    LiveFluentThemeScope.appThemeOf(context).background;
-
-/// 与 tokens.dart 的 bodyTextColor 等价，从 [LiveFluentThemeScope] 解析。
-Color bodyTextColorLive(BuildContext context) =>
-    LiveFluentThemeScope.appThemeOf(context).bodyText;

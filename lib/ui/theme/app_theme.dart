@@ -79,10 +79,8 @@ class AppThemeData {
   Color get bodyText => _pick(AppColors.textOnPaper, AppColors.textOnInk);
 
   /// 发丝线：浅基底米棕，深基底炭灰。
-  Color get hairline => _pick(
-    AppColors.hairlineOnPaper,
-    AppColors.hairlineOnInk,
-  );
+  Color get hairline =>
+      _pick(AppColors.hairlineOnPaper, AppColors.hairlineOnInk);
 
   /// 弱化文字。
   Color get mutedText => _pick(AppColors.mutedOnPaper, AppColors.mutedOnInk);
@@ -91,10 +89,9 @@ class AppThemeData {
   ///
   /// 内置主题精确沿用 cinnabarSoft；自定义主题把强调色向背景轻混，
   /// 得到与该主题协调的柔和档。
-  Color get accentSoft =>
-      builtin && accent == AppColors.cinnabar
-          ? AppColors.cinnabarSoft
-          : Color.lerp(accent, background, 0.25)!;
+  Color get accentSoft => builtin && accent == AppColors.cinnabar
+      ? AppColors.cinnabarSoft
+      : Color.lerp(accent, background, 0.25)!;
 }
 
 /// 由主题模型构建 FluentThemeData：明暗、强调色板、脚手架底色。
@@ -130,9 +127,8 @@ AccentColor _cinnabarSwatch() => AccentColor.swatch(const <String, Color>{
 AccentColor _accentSwatch(Color accent, {required bool builtin}) {
   if (builtin && accent == AppColors.cinnabar) return _cinnabarSwatch();
   final HSLColor hsl = HSLColor.fromColor(accent);
-  Color shift(double delta) => hsl
-      .withLightness((hsl.lightness + delta).clamp(0.0, 1.0))
-      .toColor();
+  Color shift(double delta) =>
+      hsl.withLightness((hsl.lightness + delta).clamp(0.0, 1.0)).toColor();
   return AccentColor.swatch(<String, Color>{
     'normal': accent,
     'light1': shift(0.12),

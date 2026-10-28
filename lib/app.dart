@@ -221,7 +221,8 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
         // 实时主题 scope：builder 插入的 widget 是 Navigator 的祖先，
         // 普通 InheritedWidget 不会被 InheritedTheme.capture 冻结，
         // 菜单/气泡等 overlay 路由内容由此拿到切换后的主题。
-        final AppThemeData effective = custom ??
+        final AppThemeData effective =
+            custom ??
             AppThemeData.builtinFor(
               _themeMode == ThemeMode.light
                   ? Brightness.light

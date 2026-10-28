@@ -1,6 +1,8 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 
+import '../core/text/composing.dart';
+
 /// 创建和作品信息共用表单。异步提交成功才关闭，失败保留输入供重试。
 class BookDetailsDialog<T> extends StatefulWidget {
   const BookDetailsDialog({
@@ -34,10 +36,7 @@ class _BookDetailsDialogState<T> extends State<BookDetailsDialog<T>> {
       );
   bool _saving = false;
   String? _error;
-  bool get _composing => [
-    _name,
-    _notes,
-  ].any((c) => c.value.composing.isValid && !c.value.composing.isCollapsed);
+  bool get _composing => [_name, _notes].any((c) => isComposingValue(c.value));
   @override
   void initState() {
     super.initState();
@@ -114,8 +113,7 @@ class _BookDetailsDialogState<T> extends State<BookDetailsDialog<T>> {
                     TextEditingValue oldValue,
                     TextEditingValue newValue,
                   ) {
-                    if (newValue.composing.isValid &&
-                        !newValue.composing.isCollapsed) {
+                    if (isComposingValue(newValue)) {
                       return newValue;
                     }
                     return _limit.formatEditUpdate(

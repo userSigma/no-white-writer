@@ -4,6 +4,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import '../core/chapter_numbering.dart';
 import '../core/models.dart';
+import '../core/text/composing.dart';
 import '../state/workspace_controller.dart';
 
 class VolumeSettingsDialog extends StatefulWidget {
@@ -45,9 +46,7 @@ class _VolumeSettingsDialogState extends State<VolumeSettingsDialog> {
     _start,
     _step,
   ];
-  bool get _composing => _fields.any(
-    (c) => c.value.composing.isValid && !c.value.composing.isCollapsed,
-  );
+  bool get _composing => _fields.any((c) => isComposingValue(c.value));
   @override
   void initState() {
     super.initState();

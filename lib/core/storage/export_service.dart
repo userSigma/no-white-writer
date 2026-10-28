@@ -4,6 +4,7 @@ import 'dart:io';
 import '../platform/path_utils.dart';
 import 'app_paths.dart';
 import 'atomic_file_writer.dart';
+import 'bytes.dart';
 
 /// 导出规格见 PLAN.md §4.9。全部写入走临时文件 + rename。
 class ExportService {
@@ -177,12 +178,7 @@ class ExportService {
           FileSystemEntityType.file) {
         return false;
       }
-      final actual = await file.readAsBytes();
-      if (actual.length != expected.length) return false;
-      for (var i = 0; i < actual.length; i++) {
-        if (actual[i] != expected[i]) return false;
-      }
-      return true;
+      return bytesEqual(await file.readAsBytes(), expected);
     } on FileSystemException {
       return false;
     }

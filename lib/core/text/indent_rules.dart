@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import 'composing.dart';
+
 /// 首行缩进常量：两个全角空格（PLAN.md §8.1）。
 const String kIndent = '\u3000\u3000';
 
@@ -14,8 +16,7 @@ TextEditingValue applyEnterIndent(
   required bool blankLineBetween,
 }) {
   if (!autoIndent) return newValue;
-  final TextRange composing = newValue.composing;
-  if (composing.isValid && !composing.isCollapsed) return newValue;
+  if (isComposingValue(newValue)) return newValue;
 
   final String text = newValue.text;
   final int? newlineAt = _singleNewlineInsertion(oldValue.text, text);
