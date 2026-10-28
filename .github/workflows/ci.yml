@@ -22,7 +22,7 @@ jobs:
     name: 格式 / 静态分析 / 测试
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:
@@ -46,7 +46,7 @@ jobs:
     name: Windows x64 release 构建验证
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:
@@ -62,7 +62,7 @@ jobs:
 
       # 产物仅用于排查构建问题，不是正式发布包（正式包走 release.yml）。
       - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: windows-x64-release-${{ github.sha }}
           path: build/windows/x64/runner/Release/
