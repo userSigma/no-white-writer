@@ -125,6 +125,39 @@ void main() {
       expect(records.single.isMissing, isTrue);
       expect(records.single.chapterTitle, '第一章');
     });
+
+    test('tmp 转正失败必须抛出并保留原现场', () async {
+      final File txt = chapters.fileOf(bookId, volumeId, chapterId);
+      await chapters.writeText(bookId, volumeId, chapterId, '旧正文');
+      final File tmp = File('${txt.path}.tmp');
+      await tmp.writeAsString('新正文');
+      await tmp.setLastModified(DateTime.now().add(const Duration(minutes: 1)));
+      final Directory conflictingBak = Directory('${txt.path}.bak');
+      await conflictingBak.create();
+
+      await expectLater(
+        chapters.recover(sampleBook()),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await txt.readAsString(), '旧正文');
+      expect(await tmp.readAsString(), '新正文');
+      expect(await conflictingBak.exists(), isTrue);
+    });
+
+    test('bak 恢复失败必须抛出且不当作缺章', () async {
+      final File txt = chapters.fileOf(bookId, volumeId, chapterId);
+      await txt.parent.create(recursive: true);
+      final File bak = File('${txt.path}.bak');
+      await bak.writeAsString('备份正文');
+      await Directory(txt.path).create();
+
+      await expectLater(
+        chapters.recover(sampleBook()),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await bak.readAsString(), '备份正文');
+      expect(await Directory(txt.path).exists(), isTrue);
+    });
   });
 
   group('ExportService', () {

@@ -528,10 +528,10 @@ class _EditorPageState extends State<EditorPage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
                             if (chapterNumberLabel(
-                              workspace.book,
-                              workspace.volume!,
-                              workspace.chapter!.id,
-                            )
+                                  workspace.book,
+                                  workspace.volume!,
+                                  workspace.chapter!.id,
+                                )
                                 case final label?)
                               Text(
                                 label,

@@ -35,8 +35,8 @@ class I18nScope extends InheritedWidget {
 /// 查找顺序：当前语言包 → `zh-CN` → key 本身；随后替换文案中的
 /// `{占位符}`。context 不在 [I18nScope] 内时使用内置兜底控制器。
 String t(BuildContext context, String key, [Map<String, String>? args]) {
-  final I18nScope? scope = context.dependOnInheritedWidgetOfExactType<
-      I18nScope>();
+  final I18nScope? scope = context
+      .dependOnInheritedWidgetOfExactType<I18nScope>();
   return (scope?.controller ?? fallbackI18n).translate(key, args);
 }
 

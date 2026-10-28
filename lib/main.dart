@@ -107,9 +107,9 @@ Future<void> main() async {
     AppLogger.instance.warn('i18n.language.unknown', settings.language);
   }
 
-  // 崩溃恢复必须在 library.load 之前：恢复后的正文长度会影响书架字数统计。
+  // 崩溃恢复必须在书架页面加载之前：恢复后的正文长度会影响书架字数统计。
   final List<RecoveryRecord> recovered = <RecoveryRecord>[];
-  final LibraryIndex rawLibrary = await libraryStore.load();
+  final LibraryIndex rawLibrary = await libraryStore.loadOrRebuild(bookStore);
   for (final BookSummary summary in rawLibrary.books) {
     final BookIndex book = await bookStore.load(summary);
     recovered.addAll(await chapterStore.recover(book));

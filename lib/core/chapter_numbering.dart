@@ -31,9 +31,7 @@ int chapterNumberIndex(BookIndex book, Volume volume, String chapterId) {
       int index = 0;
       for (final Volume v in book.volumes) {
         if (v.numberingMode != VolumeNumberingMode.followGlobal) continue;
-        final int inVolume = v.chapters.indexWhere(
-          (c) => c.id == chapterId,
-        );
+        final int inVolume = v.chapters.indexWhere((c) => c.id == chapterId);
         if (inVolume >= 0) return index + inVolume;
         index += v.chapters.length;
       }

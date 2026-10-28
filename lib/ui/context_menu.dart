@@ -272,9 +272,7 @@ class _MenuState extends State<_Menu> {
                                     FluentIcons.chevron_right,
                                     size: 11,
                                     color:
-                                        theme
-                                            .resources
-                                            .textFillColorSecondary,
+                                        theme.resources.textFillColorSecondary,
                                   ),
                                 ),
                             ],

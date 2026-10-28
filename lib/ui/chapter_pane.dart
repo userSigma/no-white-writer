@@ -208,8 +208,7 @@ class _ChapterPaneState extends State<ChapterPane> {
         padding: const EdgeInsets.fromLTRB(10, 12, 10, 24),
         children: [
           GestureDetector(
-            onSecondaryTapDown: (d) =>
-                _bookMenu(context, d.globalPosition),
+            onSecondaryTapDown: (d) => _bookMenu(context, d.globalPosition),
             onLongPressStart: (d) => _bookMenu(context, d.globalPosition),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -233,19 +232,15 @@ class _ChapterPaneState extends State<ChapterPane> {
                       child: IconButton(
                         key: const ValueKey('book-menu-button'),
                         icon: const Icon(FluentIcons.more, size: 14),
-                        onPressed:
-                            w.editingLocked || w.moving || _savingName
+                        onPressed: w.editingLocked || w.moving || _savingName
                             ? null
                             : () {
                                 final box =
-                                    buttonContext
-                                        .findRenderObject()! as
-                                    RenderBox;
+                                    buttonContext.findRenderObject()!
+                                        as RenderBox;
                                 _bookMenu(
                                   context,
-                                  box.localToGlobal(
-                                    Offset(0, box.size.height),
-                                  ),
+                                  box.localToGlobal(Offset(0, box.size.height)),
                                 );
                               },
                       ),
@@ -852,8 +847,7 @@ class _ChapterPaneState extends State<ChapterPane> {
         if (!await _submitName() || !context.mounted) return;
         await showDialog<bool>(
           context: context,
-          builder: (_) =>
-              NumberingSettingsDialog(workspace: w, volume: volume),
+          builder: (_) => NumberingSettingsDialog(workspace: w, volume: volume),
         );
       case 'delete':
         if (!await _submitName() || !context.mounted) return;

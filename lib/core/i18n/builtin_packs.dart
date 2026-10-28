@@ -3,10 +3,11 @@
 /// 词条按界面分组命名（`settings.*` / `sidebar.*` / `volume.*` / …）。
 /// 外部语言包只需覆盖自己想翻译的 key；缺失 key 自动回退 zh-CN。
 const List<({String code, String name, Map<String, String> strings})>
-builtinPackSources = <({String code, String name, Map<String, String> strings})>[
-  (code: 'zh-CN', name: '简体中文', strings: _zhCn),
-  (code: 'en', name: 'English', strings: _en),
-];
+builtinPackSources =
+    <({String code, String name, Map<String, String> strings})>[
+      (code: 'zh-CN', name: '简体中文', strings: _zhCn),
+      (code: 'en', name: 'English', strings: _en),
+    ];
 
 const Map<String, String> _zhCn = <String, String>{
   // 通用
@@ -44,8 +45,7 @@ const Map<String, String> _zhCn = <String, String>{
   'settings.theme.create.confirm': '创建并应用',
   'settings.theme.created': '已创建并应用「{name}」',
   'settings.theme.rename.failed': '重命名失败：名称不能为空。',
-  'settings.theme.delete.confirm.body':
-      '删除后不可恢复；若正在使用该主题，将回退为跟随系统。',
+  'settings.theme.delete.confirm.body': '删除后不可恢复；若正在使用该主题，将回退为跟随系统。',
   'settings.fontSize': '字号',
   'settings.lineHeight': '行距',
   'settings.autoIndent': '自动首行缩进',
@@ -150,8 +150,7 @@ const Map<String, String> _en = <String, String>{
   'common.untitledVolume': 'Untitled volume',
   'common.untitledChapter': 'Untitled chapter',
   'common.ok': 'Got it',
-  'delete.confirm.body':
-      'The draft is saved first; content moves to the trash instead of being permanently deleted.',
+  'delete.confirm.body': 'The draft is saved first; content moves to the trash instead of being permanently deleted.',
 
   // Settings dialog
   'settings.title': 'Settings',
@@ -178,8 +177,7 @@ const Map<String, String> _en = <String, String>{
   'settings.theme.create.confirm': 'Create & apply',
   'settings.theme.created': 'Created and applied "{name}"',
   'settings.theme.rename.failed': 'Rename failed: the name cannot be empty.',
-  'settings.theme.delete.confirm.body':
-      'This cannot be undone. If the theme is in use, the app falls back to following the system.',
+  'settings.theme.delete.confirm.body': 'This cannot be undone. If the theme is in use, the app falls back to following the system.',
   'settings.fontSize': 'Font size',
   'settings.lineHeight': 'Line spacing',
   'settings.autoIndent': 'Auto first-line indent',
@@ -237,8 +235,7 @@ const Map<String, String> _en = <String, String>{
   'volume.move': 'Move',
   'volume.export': 'Export this volume',
   'volume.delete': 'Delete volume',
-  'volume.delete.confirm':
-      'Delete "{name}" and its {count} chapter(s)?',
+  'volume.delete.confirm': 'Delete "{name}" and its {count} chapter(s)?',
 
   // Chapter menu
   'chapter.rename': 'Rename chapter',
@@ -261,10 +258,8 @@ const Map<String, String> _en = <String, String>{
   // Numbering dialogs (global / per-volume)
   'numbering.global.title': 'Global auto chapter numbering',
   'numbering.volume.title': 'Volume numbering · {name}',
-  'numbering.enabled.caption':
-      'Enable global auto chapter numbering (display only; titles and text are unchanged)',
-  'numbering.volume.caption':
-      'This volume numbers itself with its own rule (display only; titles and text are unchanged).',
+  'numbering.enabled.caption': 'Enable global auto chapter numbering (display only; titles and text are unchanged)',
+  'numbering.volume.caption': 'This volume numbers itself with its own rule (display only; titles and text are unchanged).',
   'numbering.prefix': 'Prefix',
   'numbering.suffix': 'Suffix',
   'numbering.style': 'Number style',

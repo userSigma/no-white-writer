@@ -434,8 +434,10 @@ void main() {
       await tester.tap(find.text('卷内独立编号'));
       await finishIo(
         tester,
-        until: () =>
-            find.byKey(const ValueKey('numbering-dialog')).evaluate().isNotEmpty,
+        until: () => find
+            .byKey(const ValueKey('numbering-dialog'))
+            .evaluate()
+            .isNotEmpty,
       );
     }
 

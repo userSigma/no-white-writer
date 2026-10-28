@@ -163,7 +163,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       return true;
     } catch (error) {
       if (!mounted) return false;
-      _notice(t(context, 'settings.saveError', {'error': '$error'}), error: true);
+      _notice(
+        t(context, 'settings.saveError', {'error': '$error'}),
+        error: true,
+      );
       return false;
     }
   }
@@ -366,356 +369,365 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         autofocus: true,
         onKeyEvent: _key,
         child: ContentDialog(
-        key: const ValueKey('settings-menu'),
-        title: Text(
-          t(context, 'settings.title'),
-          style: const TextStyle(
-            color: AppColors.cinnabar,
-            fontWeight: FontWeight.w600,
+          key: const ValueKey('settings-menu'),
+          title: Text(
+            t(context, 'settings.title'),
+            style: const TextStyle(
+              color: AppColors.cinnabar,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        content: SizedBox(
-          width: 500,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _row(
-                  t(context, 'settings.language'),
-                  ComboBox<String>(
-                    key: const ValueKey('settings-language'),
-                    value: packs.any((p) => p.code == app.i18n.currentCode)
-                        ? app.i18n.currentCode
-                        : null,
-                    items: <ComboBoxItem<String>>[
-                      for (final pack in packs)
-                        ComboBoxItem<String>(
-                          value: pack.code,
-                          child: Text('${pack.name} (${pack.code})'),
-                        ),
-                    ],
-                    onChanged: _working
-                        ? null
-                        : (code) {
-                            if (code != null) _setLanguage(code);
-                          },
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _row(
+                    t(context, 'settings.language'),
+                    ComboBox<String>(
+                      key: const ValueKey('settings-language'),
+                      value: packs.any((p) => p.code == app.i18n.currentCode)
+                          ? app.i18n.currentCode
+                          : null,
+                      items: <ComboBoxItem<String>>[
+                        for (final pack in packs)
+                          ComboBoxItem<String>(
+                            value: pack.code,
+                            child: Text('${pack.name} (${pack.code})'),
+                          ),
+                      ],
+                      onChanged: _working
+                          ? null
+                          : (code) {
+                              if (code != null) _setLanguage(code);
+                            },
+                    ),
                   ),
-                ),
-                _row(
-                  t(context, 'settings.theme'),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      ComboBox<String>(
-                        key: const ValueKey('settings-theme'),
-                        value: themeEntries
-                            .any((e) => e.$1 == settings.themeMode)
-                            ? settings.themeMode
-                            : null,
-                        items: <ComboBoxItem<String>>[
-                          for (final entry in themeEntries)
-                            ComboBoxItem<String>(
-                              value: entry.$1,
-                              child: Text(entry.$2),
+                  _row(
+                    t(context, 'settings.theme'),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        ComboBox<String>(
+                          key: const ValueKey('settings-theme'),
+                          value:
+                              themeEntries.any(
+                                (e) => e.$1 == settings.themeMode,
+                              )
+                              ? settings.themeMode
+                              : null,
+                          items: <ComboBoxItem<String>>[
+                            for (final entry in themeEntries)
+                              ComboBoxItem<String>(
+                                value: entry.$1,
+                                child: Text(entry.$2),
+                              ),
+                          ],
+                          onChanged: _working || _composing
+                              ? null
+                              : (mode) {
+                                  if (mode != null) {
+                                    app.settings.setThemeMode(mode);
+                                  }
+                                },
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            Button(
+                              onPressed:
+                                  _working ||
+                                      _composing ||
+                                      settings.customThemes.length >=
+                                          SettingsController.customThemeLimit
+                                  ? null
+                                  : () => unawaited(_createCustomTheme()),
+                              child: Text(
+                                t(context, 'settings.theme.newCustom'),
+                              ),
+                            ),
+                            if (settings.customThemes.isNotEmpty)
+                              Button(
+                                onPressed: _working || _composing
+                                    ? null
+                                    : () => setState(
+                                        () => _manageOpen = !_manageOpen,
+                                      ),
+                                child: Text(
+                                  t(context, 'settings.theme.manage'),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (_manageOpen) ...<Widget>[
+                          const SizedBox(height: 8),
+                          for (final CustomTheme theme in settings.customThemes)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Row(
+                                children: <Widget>[
+                                  Expanded(child: Text(theme.name)),
+                                  Button(
+                                    key: ValueKey(
+                                      'custom-theme-rename-${theme.id}',
+                                    ),
+                                    onPressed: _working || _composing
+                                        ? null
+                                        : () => unawaited(
+                                            _renameCustomTheme(theme),
+                                          ),
+                                    child: Text(t(context, 'common.rename')),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Button(
+                                    key: ValueKey(
+                                      'custom-theme-delete-${theme.id}',
+                                    ),
+                                    onPressed: _working || _composing
+                                        ? null
+                                        : () => unawaited(
+                                            _deleteCustomTheme(theme),
+                                          ),
+                                    child: Text(t(context, 'common.delete')),
+                                  ),
+                                ],
+                              ),
                             ),
                         ],
+                      ],
+                    ),
+                  ),
+                  _divider(),
+                  _row(
+                    t(context, 'settings.fontSize'),
+                    _combo(
+                      comboKey: const ValueKey('settings-font-size'),
+                      value: fontSizes.contains(settings.fontSize)
+                          ? settings.fontSize
+                          : null,
+                      values: fontSizes,
+                      label: (v) => v.toInt().toString(),
+                      onChanged: (value) {
+                        if (value != null) app.settings.setFontSize(value);
+                      },
+                    ),
+                  ),
+                  _row(
+                    t(context, 'settings.lineHeight'),
+                    _combo(
+                      comboKey: const ValueKey('settings-line-height'),
+                      value: lineHeights.contains(settings.lineHeight)
+                          ? settings.lineHeight
+                          : null,
+                      values: lineHeights,
+                      label: (v) => v.toStringAsFixed(1),
+                      onChanged: (value) {
+                        if (value != null) app.settings.setLineHeight(value);
+                      },
+                    ),
+                  ),
+                  _row(
+                    t(context, 'settings.autoIndent'),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ToggleSwitch(
+                        key: const ValueKey('settings-auto-indent'),
+                        checked: settings.autoIndent,
                         onChanged: _working || _composing
                             ? null
-                            : (mode) {
-                                if (mode != null) {
-                                  app.settings.setThemeMode(mode);
-                                }
-                              },
+                            : app.settings.setAutoIndent,
                       ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          Button(
-                            onPressed:
-                                _working || _composing ||
-                                    settings.customThemes.length >=
-                                        SettingsController.customThemeLimit
-                                ? null
-                                : () => unawaited(_createCustomTheme()),
-                            child: Text(
-                              t(context, 'settings.theme.newCustom'),
+                    ),
+                  ),
+                  _row(
+                    t(context, 'settings.blankLine'),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ToggleSwitch(
+                        key: const ValueKey('settings-blank-line'),
+                        checked: settings.blankLineBetween,
+                        onChanged: _working || _composing
+                            ? null
+                            : app.settings.setBlankLineBetween,
+                      ),
+                    ),
+                  ),
+                  _divider(),
+                  _row(
+                    t(context, 'settings.exportDir'),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        TextBox(
+                          key: const ValueKey('settings-export-path'),
+                          controller: _path,
+                          enabled: !_working,
+                          placeholder: t(context, 'settings.exportDir.hint'),
+                          onEditingComplete: () {},
+                          onSubmitted: (_) {
+                            if (!_composing) unawaited(_savePath());
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            Button(
+                              onPressed: _working || _composing
+                                  ? null
+                                  : () => unawaited(_savePath()),
+                              child: Text(t(context, 'common.save')),
                             ),
-                          ),
-                          if (settings.customThemes.isNotEmpty)
                             Button(
                               onPressed: _working || _composing
                                   ? null
                                   : () =>
-                                        setState(() => _manageOpen = !_manageOpen),
+                                        unawaited(_savePath(useDefault: true)),
                               child: Text(
-                                t(context, 'settings.theme.manage'),
+                                t(context, 'settings.exportDir.reset'),
                               ),
                             ),
-                        ],
-                      ),
-                      if (_manageOpen) ...<Widget>[
-                        const SizedBox(height: 8),
-                        for (final CustomTheme theme in settings.customThemes)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
-                            child: Row(
-                              children: <Widget>[
-                                Expanded(child: Text(theme.name)),
-                                Button(
-                                  key: ValueKey(
-                                    'custom-theme-rename-${theme.id}',
-                                  ),
-                                  onPressed: _working || _composing
-                                      ? null
-                                      : () =>
-                                            unawaited(_renameCustomTheme(theme)),
-                                  child: Text(t(context, 'common.rename')),
-                                ),
-                                const SizedBox(width: 8),
-                                Button(
-                                  key: ValueKey(
-                                    'custom-theme-delete-${theme.id}',
-                                  ),
-                                  onPressed: _working || _composing
-                                      ? null
-                                      : () =>
-                                            unawaited(_deleteCustomTheme(theme)),
-                                  child: Text(t(context, 'common.delete')),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ],
-                  ),
-                ),
-                _divider(),
-                _row(
-                  t(context, 'settings.fontSize'),
-                  _combo(
-                    comboKey: const ValueKey('settings-font-size'),
-                    value: fontSizes.contains(settings.fontSize)
-                        ? settings.fontSize
-                        : null,
-                    values: fontSizes,
-                    label: (v) => v.toInt().toString(),
-                    onChanged: (value) {
-                      if (value != null) app.settings.setFontSize(value);
-                    },
-                  ),
-                ),
-                _row(
-                  t(context, 'settings.lineHeight'),
-                  _combo(
-                    comboKey: const ValueKey('settings-line-height'),
-                    value: lineHeights.contains(settings.lineHeight)
-                        ? settings.lineHeight
-                        : null,
-                    values: lineHeights,
-                    label: (v) => v.toStringAsFixed(1),
-                    onChanged: (value) {
-                      if (value != null) app.settings.setLineHeight(value);
-                    },
-                  ),
-                ),
-                _row(
-                  t(context, 'settings.autoIndent'),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: ToggleSwitch(
-                      key: const ValueKey('settings-auto-indent'),
-                      checked: settings.autoIndent,
-                      onChanged: _working || _composing
-                          ? null
-                          : app.settings.setAutoIndent,
-                    ),
-                  ),
-                ),
-                _row(
-                  t(context, 'settings.blankLine'),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: ToggleSwitch(
-                      key: const ValueKey('settings-blank-line'),
-                      checked: settings.blankLineBetween,
-                      onChanged: _working || _composing
-                          ? null
-                          : app.settings.setBlankLineBetween,
-                    ),
-                  ),
-                ),
-                _divider(),
-                _row(
-                  t(context, 'settings.exportDir'),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      TextBox(
-                        key: const ValueKey('settings-export-path'),
-                        controller: _path,
-                        enabled: !_working,
-                        placeholder: t(context, 'settings.exportDir.hint'),
-                        onEditingComplete: () {},
-                        onSubmitted: (_) {
-                          if (!_composing) unawaited(_savePath());
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          Button(
-                            onPressed: _working || _composing
-                                ? null
-                                : () => unawaited(_savePath()),
-                            child: Text(t(context, 'common.save')),
-                          ),
-                          Button(
-                            onPressed: _working || _composing
-                                ? null
-                                : () => unawaited(_savePath(useDefault: true)),
-                            child: Text(
-                              t(context, 'settings.exportDir.reset'),
-                            ),
-                          ),
-                          Button(
-                            onPressed: _working || _composing
-                                ? null
-                                : () {
-                                    if (_dirty) {
-                                      _notice(
-                                        t(
-                                          context,
-                                          'settings.exportDir.pending',
+                            Button(
+                              onPressed: _working || _composing
+                                  ? null
+                                  : () {
+                                      if (_dirty) {
+                                        _notice(
+                                          t(
+                                            context,
+                                            'settings.exportDir.pending',
+                                          ),
+                                          error: true,
+                                        );
+                                        return;
+                                      }
+                                      unawaited(
+                                        _openDirectory(
+                                          app.paths.exportRoot(
+                                            settings.exportDirectory,
+                                          ),
                                         ),
-                                        error: true,
                                       );
-                                      return;
-                                    }
-                                    unawaited(
-                                      _openDirectory(
-                                        app.paths.exportRoot(
-                                          settings.exportDirectory,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                            child: Text(
-                              t(context, 'settings.exportDir.open'),
+                                    },
+                              child: Text(
+                                t(context, 'settings.exportDir.open'),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                _row(
-                  '',
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      Button(
-                        onPressed: _working
-                            ? null
-                            : () =>
-                                  unawaited(_openDirectory(app.paths.dataRootPath)),
-                        child: Text(t(context, 'settings.dataDir')),
-                      ),
-                      Button(
-                        onPressed: _working
-                            ? null
-                            : () =>
-                                  unawaited(_openDirectory(app.paths.logsDir)),
-                        child: Text(t(context, 'settings.logsDir')),
-                      ),
-                    ],
-                  ),
-                ),
-                _divider(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        t(context, 'settings.about.version'),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        t(context, 'settings.about.desc'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: mutedTextColor(context),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (error != null) ...<Widget>[
-                  const SizedBox(height: 8),
-                  Text(
-                    t(context, 'settings.saveError', {'error': error}),
-                    key: const ValueKey('settings-save-error'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: FluentTheme.of(context).accentColor.darkest,
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Button(
-                    onPressed: _working || _composing
-                        ? null
-                        : () async {
-                            if (_dirty) {
-                              await _savePath();
-                              return;
-                            }
-                            try {
-                              await app.settings.flush();
-                              if (!context.mounted) return;
-                              _notice(t(context, 'settings.saved'));
-                            } catch (error) {
-                              if (!context.mounted) return;
-                              _notice(
-                                t(context, 'settings.saveError', {
-                                  'error': '$error',
-                                }),
-                                error: true,
-                              );
-                            }
-                          },
-                    child: Text(t(context, 'settings.retrySave')),
+                  _row(
+                    '',
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        Button(
+                          onPressed: _working
+                              ? null
+                              : () => unawaited(
+                                  _openDirectory(app.paths.dataRootPath),
+                                ),
+                          child: Text(t(context, 'settings.dataDir')),
+                        ),
+                        Button(
+                          onPressed: _working
+                              ? null
+                              : () => unawaited(
+                                  _openDirectory(app.paths.logsDir),
+                                ),
+                          child: Text(t(context, 'settings.logsDir')),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-                if (_message != null)
+                  _divider(),
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: InfoBar(
-                      key: const ValueKey('settings-notice'),
-                      title: Text(_message!),
-                      severity: _messageError
-                          ? InfoBarSeverity.error
-                          : InfoBarSeverity.success,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          t(context, 'settings.about.version'),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          t(context, 'settings.about.desc'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: mutedTextColor(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-              ],
+                  if (error != null) ...<Widget>[
+                    const SizedBox(height: 8),
+                    Text(
+                      t(context, 'settings.saveError', {'error': error}),
+                      key: const ValueKey('settings-save-error'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: FluentTheme.of(context).accentColor.darkest,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Button(
+                      onPressed: _working || _composing
+                          ? null
+                          : () async {
+                              if (_dirty) {
+                                await _savePath();
+                                return;
+                              }
+                              try {
+                                await app.settings.flush();
+                                if (!context.mounted) return;
+                                _notice(t(context, 'settings.saved'));
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                _notice(
+                                  t(context, 'settings.saveError', {
+                                    'error': '$error',
+                                  }),
+                                  error: true,
+                                );
+                              }
+                            },
+                      child: Text(t(context, 'settings.retrySave')),
+                    ),
+                  ],
+                  if (_message != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: InfoBar(
+                        key: const ValueKey('settings-notice'),
+                        title: Text(_message!),
+                        severity: _messageError
+                            ? InfoBarSeverity.error
+                            : InfoBarSeverity.success,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: <Widget>[
-          FilledButton(
-            onPressed: _working || _composing || _confirming
-                ? null
-                : () => unawaited(requestClose()),
-            child: Text(t(context, 'common.close')),
-          ),
-        ],
+          actions: <Widget>[
+            FilledButton(
+              onPressed: _working || _composing || _confirming
+                  ? null
+                  : () => unawaited(requestClose()),
+              child: Text(t(context, 'common.close')),
+            ),
+          ],
         ),
       ),
     );

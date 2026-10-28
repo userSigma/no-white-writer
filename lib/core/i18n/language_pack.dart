@@ -17,7 +17,9 @@ class LanguagePack {
   final Map<String, String> strings;
 
   /// 合法语言代码：字母开头，2-24 位字母/数字/`-`/`_`。
-  static final RegExp _codePattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_-]{1,23}$');
+  static final RegExp _codePattern = RegExp(
+    r'^[A-Za-z0-9][A-Za-z0-9_-]{1,23}$',
+  );
 
   /// 解析语言包 JSON 文本。约定结构：
   ///
@@ -43,10 +45,7 @@ class LanguagePack {
     }
     final String code = rawCode.trim();
     if (!_codePattern.hasMatch(code)) {
-      return (
-        null,
-        '"code"（$code）只应为 2-24 位字母、数字、-、_，且以字母或数字开头',
-      );
+      return (null, '"code"（$code）只应为 2-24 位字母、数字、-、_，且以字母或数字开头');
     }
     final Object? rawName = decoded['name'];
     if (rawName is! String || rawName.trim().isEmpty) {

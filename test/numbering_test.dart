@@ -34,13 +34,21 @@ void main() {
   });
 
   test('跟随全局的卷按全书连续序号且全局关闭时不编号', () {
-    final v1 = Volume(id: 'v1', title: '一', order: 0, chapters: [
-      ChapterMeta(id: 'a', title: '甲', order: 0),
-      ChapterMeta(id: 'b', title: '乙', order: 1),
-    ]);
-    final v2 = Volume(id: 'v2', title: '二', order: 1, chapters: [
-      ChapterMeta(id: 'c', title: '丙', order: 0),
-    ]);
+    final v1 = Volume(
+      id: 'v1',
+      title: '一',
+      order: 0,
+      chapters: [
+        ChapterMeta(id: 'a', title: '甲', order: 0),
+        ChapterMeta(id: 'b', title: '乙', order: 1),
+      ],
+    );
+    final v2 = Volume(
+      id: 'v2',
+      title: '二',
+      order: 1,
+      chapters: [ChapterMeta(id: 'c', title: '丙', order: 0)],
+    );
     final book = _book([v1, v2]);
     // 全局关闭：跟随全局的卷不显示编号。
     expect(displayChapterTitle(book, v1, v1.chapters[0]), '甲');

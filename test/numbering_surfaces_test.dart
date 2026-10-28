@@ -21,28 +21,25 @@ void main() {
     h.app.editor.title.text = '第 2 章 原章名';
     h.app.editor.text.text = '只导出正文\n';
     await h.app.editor.flush();
-    await h.app.editor.runStructure(
-      b,
-      () async {
-        await h.app.library.setVolumeNumberingMode(
-          b,
-          v,
-          VolumeNumberingMode.independent,
-        );
-        await h.app.library.setNumbering(
-          b,
-          v,
-          const ChapterNumbering(
-            enabled: true,
-            prefix: '',
-            suffix: '',
-            padding: 3,
-            start: 7,
-            step: 2,
-          ),
-        );
-      },
-    );
+    await h.app.editor.runStructure(b, () async {
+      await h.app.library.setVolumeNumberingMode(
+        b,
+        v,
+        VolumeNumberingMode.independent,
+      );
+      await h.app.library.setNumbering(
+        b,
+        v,
+        const ChapterNumbering(
+          enabled: true,
+          prefix: '',
+          suffix: '',
+          padding: 3,
+          start: 7,
+          step: 2,
+        ),
+      );
+    });
     final one = (await h.app.exporter.export(
           ExportTarget.chapter(b.id, v.id, c.id),
         ))!,

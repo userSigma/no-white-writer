@@ -249,29 +249,30 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
             controller: app.i18n,
             languageCode: app.i18n.currentCode,
             child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ?child,
-              if (_exitMessage != null)
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: InfoBar(
-                        title: Text(_exitMessage!),
-                        severity: InfoBarSeverity.warning,
-                        action: Button(
-                          onPressed: () => setState(() => _exitMessage = null),
-                          child: const Text('知道了'),
+              fit: StackFit.expand,
+              children: [
+                ?child,
+                if (_exitMessage != null)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: InfoBar(
+                          title: Text(_exitMessage!),
+                          severity: InfoBarSeverity.warning,
+                          action: Button(
+                            onPressed: () =>
+                                setState(() => _exitMessage = null),
+                            child: const Text('知道了'),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            ),
           ),
         );
       },

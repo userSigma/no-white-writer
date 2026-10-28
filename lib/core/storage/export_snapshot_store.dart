@@ -143,8 +143,9 @@ class ExportSnapshotStore {
         }
         _checkNumbering(volume['numbering'], members.length);
         final bool followGlobal = switch (volume['numberingMode']) {
-          null => volume['numbering'] is Map<String, dynamic> &&
-              volume['numbering']['enabled'] != true,
+          null =>
+            volume['numbering'] is Map<String, dynamic> &&
+                volume['numbering']['enabled'] != true,
           'follow-global' => true,
           'independent' || 'none' => false,
           _ => throw const FormatException('编号模式无效，已停止导出'),

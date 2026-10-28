@@ -32,10 +32,9 @@ class NumberingSettingsDialog extends StatefulWidget {
 class _NumberingSettingsDialogState extends State<NumberingSettingsDialog> {
   bool get _isGlobal => widget.volume == null;
 
-  ChapterNumbering get _initial =>
-      _isGlobal
-          ? widget.workspace.book.globalNumbering
-          : widget.volume!.numbering;
+  ChapterNumbering get _initial => _isGlobal
+      ? widget.workspace.book.globalNumbering
+      : widget.volume!.numbering;
 
   late bool _enabled = _initial.enabled;
   late String _style = _initial.style;
@@ -166,11 +165,9 @@ class _NumberingSettingsDialogState extends State<NumberingSettingsDialog> {
     }
     final String title = _isGlobal
         ? t(context, 'numbering.global.title')
-        : t(
-            context,
-            'numbering.volume.title',
-            {'name': displayVolumeTitle(widget.volume!)},
-          );
+        : t(context, 'numbering.volume.title', {
+            'name': displayVolumeTitle(widget.volume!),
+          });
     final int previewCount = _isGlobal
         ? globalNumberingChapterCount(widget.workspace.book)
         : widget.volume!.chapters.length;

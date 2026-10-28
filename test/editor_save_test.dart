@@ -64,6 +64,32 @@ void main() {
     expect(h.app.editor.isDirty, isFalse);
   });
 
+  test('正文读取失败时阻止保存且不覆盖原字节', () async {
+    final AppHarness h = await createHarness();
+    addTearDown(h.dispose);
+    final BookSummary summary = await h.app.library.createBook('读取失败');
+    final BookIndex book = await h.app.library.openBook(summary);
+    final Volume volume = book.volumes.first;
+    final ChapterMeta chapter = volume.chapters.first;
+    final File file = h.app.chapterStore.fileOf(book.id, volume.id, chapter.id);
+    final List<int> original = <int>[0xFF, 0xFE, 0xFA];
+    await file.writeAsBytes(original);
+
+    expect(
+      await h.app.editor.open(
+        inBook: book,
+        inVolume: volume,
+        inChapter: chapter,
+      ),
+      isFalse,
+    );
+    expect(h.app.editor.state, SaveState.blocked);
+    expect(h.app.editor.text.text, isEmpty);
+    expect(await h.app.editor.flush(), isFalse);
+    await h.app.editor.saveNow(force: true);
+    expect(await file.readAsBytes(), original);
+  });
+
   test('标题与正文统一保存，标题不进入 txt 或字数', () async {
     final AppHarness h = await createHarness();
     addTearDown(h.dispose);

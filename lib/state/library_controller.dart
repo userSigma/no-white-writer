@@ -126,7 +126,7 @@ class LibraryController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     try {
-      _index = await libraryStore.load();
+      _index = await libraryStore.loadOrRebuild(bookStore);
       error = null;
     } catch (e) {
       error = '$e';
@@ -525,7 +525,10 @@ class LibraryController extends ChangeNotifier {
         target.numbering.validate(target.chapters.length);
         target.numbering = _withEnabled(target.numbering, true);
       case VolumeNumberingMode.followGlobal:
-        final ChapterNumbering? global = effectiveChapterNumbering(next, target);
+        final ChapterNumbering? global = effectiveChapterNumbering(
+          next,
+          target,
+        );
         if (global != null) global.validate(globalNumberingChapterCount(next));
         target.numbering = _withEnabled(target.numbering, false);
       case VolumeNumberingMode.none:
@@ -542,18 +545,16 @@ class LibraryController extends ChangeNotifier {
       ? volume.chapters.length
       : globalNumberingChapterCount(book);
 
-  static ChapterNumbering _withEnabled(
-    ChapterNumbering rule,
-    bool enabled,
-  ) => ChapterNumbering(
-    enabled: enabled,
-    prefix: rule.prefix,
-    suffix: rule.suffix,
-    style: rule.style,
-    padding: rule.padding,
-    start: rule.start,
-    step: rule.step,
-  );
+  static ChapterNumbering _withEnabled(ChapterNumbering rule, bool enabled) =>
+      ChapterNumbering(
+        enabled: enabled,
+        prefix: rule.prefix,
+        suffix: rule.suffix,
+        style: rule.style,
+        padding: rule.padding,
+        start: rule.start,
+        step: rule.step,
+      );
 
   /// 设置书籍级「全局自动章节序号」配置（两层编号的全局层）。
   ///
@@ -562,7 +563,10 @@ class LibraryController extends ChangeNotifier {
   Future<void> setGlobalNumbering(BookIndex book, ChapterNumbering rule) =>
       _mutate(() => _setGlobalNumbering(book, rule));
 
-  Future<void> _setGlobalNumbering(BookIndex book, ChapterNumbering rule) async {
+  Future<void> _setGlobalNumbering(
+    BookIndex book,
+    ChapterNumbering rule,
+  ) async {
     if (rule.enabled) {
       rule.validate(globalNumberingChapterCount(book));
     }
@@ -604,7 +608,10 @@ class LibraryController extends ChangeNotifier {
     target.chapters.insert(index, chapter);
     // 校验口径与取号一致：移动后目标卷的编号范围必须仍合法。
     // （卷内独立 → 目标卷章数；跟随全局 → 参与全局编号的章总数。）
-    final ChapterNumbering? targetRule = effectiveChapterNumbering(next, target);
+    final ChapterNumbering? targetRule = effectiveChapterNumbering(
+      next,
+      target,
+    );
     if (targetRule != null) {
       targetRule.validate(_numberedChapterCount(next, target));
     }

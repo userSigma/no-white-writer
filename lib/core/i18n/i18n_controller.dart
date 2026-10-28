@@ -35,15 +35,11 @@ class I18nController extends ChangeNotifier {
   List<LanguagePack> get packs {
     final List<LanguagePack> external = <LanguagePack>[
       for (final String code in _externalCodes) _packs[code]!,
-    ]..sort(
-        (LanguagePack a, LanguagePack b) => a.code.compareTo(b.code),
-      );
-    return List<LanguagePack>.unmodifiable(
-      <LanguagePack>[
-        for (final String code in _builtinOrder) _packs[code]!,
-        ...external,
-      ],
-    );
+    ]..sort((LanguagePack a, LanguagePack b) => a.code.compareTo(b.code));
+    return List<LanguagePack>.unmodifiable(<LanguagePack>[
+      for (final String code in _builtinOrder) _packs[code]!,
+      ...external,
+    ]);
   }
 
   /// 最近一次外部语言包加载的错误清单（文件名 + 原因）。
@@ -51,8 +47,7 @@ class I18nController extends ChangeNotifier {
 
   String get currentCode => _currentCode;
 
-  LanguagePack get current =>
-      _packs[_currentCode] ?? _packs[fallbackCode]!;
+  LanguagePack get current => _packs[_currentCode] ?? _packs[fallbackCode]!;
 
   LanguagePack? byCode(String code) => _packs[code];
 
@@ -83,9 +78,7 @@ class I18nController extends ChangeNotifier {
   /// 翻译查找：当前语言 → 回退 `zh-CN` → key 本身；然后填充 `{占位符}`。
   String translate(String key, [Map<String, String>? args]) {
     String text =
-        current.strings[key] ??
-        _packs[fallbackCode]!.strings[key] ??
-        key;
+        current.strings[key] ?? _packs[fallbackCode]!.strings[key] ?? key;
     if (args != null && args.isNotEmpty) {
       for (final MapEntry<String, String> entry in args.entries) {
         text = text.replaceAll('{${entry.key}}', entry.value);
@@ -112,9 +105,7 @@ class I18nController extends ChangeNotifier {
     files.removeWhere(
       (File file) => !file.path.toLowerCase().endsWith('.json'),
     );
-    files.sort(
-      (File a, File b) => a.path.compareTo(b.path),
-    );
+    files.sort((File a, File b) => a.path.compareTo(b.path));
     for (final File file in files) {
       final String fileName = file.path.split(RegExp(r'[\\/]')).last;
       final (LanguagePack? pack, String? error) = await LanguagePack.tryLoad(

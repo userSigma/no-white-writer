@@ -42,13 +42,7 @@ class ExportService {
     final Directory dir = await _bookDir(bookTitle, customDir);
     final String stem = await _uniqueStem(dir, volumeTitle);
     final File file = File(pathJoin(dir.path, '$stem.txt'));
-    final StringBuffer out = StringBuffer();
-    out.write(_volumeHeader(volumeTitle));
-    for (final ({String title, String text}) chapter in chapters) {
-      out.write(_chapterHeader(chapter.title));
-      out.write(_withFinalNewline(chapter.text));
-    }
-    await _writeExport(file, _withFinalNewline(out.toString()));
+    await _writeExport(file, composeVolume(volumeTitle, chapters));
     return file;
   }
 
@@ -65,20 +59,7 @@ class ExportService {
     await dir.create(recursive: true);
     final String stem = await _uniqueStem(dir, bookTitle);
     final File file = File(pathJoin(dir.path, '$stem.txt'));
-    final StringBuffer out = StringBuffer();
-    for (final ({
-          String volumeTitle,
-          List<({String title, String text})> chapters,
-        })
-        volume
-        in volumes) {
-      out.write(_volumeHeader(volume.volumeTitle));
-      for (final ({String title, String text}) chapter in volume.chapters) {
-        out.write(_chapterHeader(chapter.title));
-        out.write(_withFinalNewline(chapter.text));
-      }
-    }
-    await _writeExport(file, _withFinalNewline(out.toString()));
+    await _writeExport(file, composeBook(volumes));
     return file;
   }
 
