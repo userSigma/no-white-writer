@@ -1,0 +1,80 @@
+# CD 发布：推送 v* 标签时构建正式 Windows x64 发布包并创建 GitHub Release。
+# 用法：改 pubspec.yaml 的 version → 提交合并到 main → 打标签 v<版本>（不含 +N）→ git push --tags。
+# 例：version: 0.4.0+4 对应标签 v0.4.0。
+# 打包约定与 README 一致：ZIP 压缩 build/windows/x64/runner/Release/ 全部内容，
+# 命名 no-white-writer-<版本>-windows-x64.zip，附 .sha256 校验文件。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: 3.47.7
+
+jobs:
+  windows-release:
+    name: Windows x64 发布包
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 依赖安装（按 pubspec.lock）
+        run: flutter pub get
+
+      # 发布前的完整门禁：analyze + 全部测试必须通过。
+      - name: 静态分析
+        run: flutter analyze
+
+      - name: 测试
+        run: flutter test
+
+      - name: 校验标签与 pubspec 版本一致
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME -replace '^v', ''
+          $pubspec = (Get-Content pubspec.yaml -Encoding UTF8 |
+            Select-String '^version:\s*(\S+)').Matches[0].Groups[1].Value
+          $base = ($pubspec -split '\+')[0]
+          if ($tag -ne $base) {
+            throw "标签 v$tag 与 pubspec.yaml 版本 $pubspec 不一致（标签应为 v$base）"
+          }
+          Write-Host "版本一致：v$base（完整版本号 $pubspec）"
+
+      - name: 构建 Windows x64 release
+        run: flutter build windows --release
+
+      - name: 打包 ZIP 并计算 SHA-256
+        shell: pwsh
+        run: |
+          $pubspec = (Get-Content pubspec.yaml -Encoding UTF8 |
+            Select-String '^version:\s*(\S+)').Matches[0].Groups[1].Value
+          $base = ($pubspec -split '\+')[0]
+          New-Item -ItemType Directory -Path build/packages -Force | Out-Null
+          $zip = "build/packages/no-white-writer-$base-windows-x64.zip"
+          if (Test-Path $zip) { throw "发布包已存在：$zip" }
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          "$hash  $(Split-Path $zip -Leaf)" | Out-File "$zip.sha256" -Encoding ascii
+          "## 发布包" >> $env:GITHUB_STEP_SUMMARY
+          "- 文件：$(Split-Path $zip -Leaf)" >> $env:GITHUB_STEP_SUMMARY
+          "- 大小：$((Get-Item $zip).Length) 字节" >> $env:GITHUB_STEP_SUMMARY
+          "- SHA-256：$hash" >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "SHA-256: $hash"
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/packages/*.zip
+            build/packages/*.sha256
+          generate_release_notes: true
