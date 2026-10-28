@@ -425,6 +425,7 @@ class EditorController extends ChangeNotifier {
       bookTitle: book!.title,
       volumeTitle: displayVolumeTitle(volume!),
       chapterTitle: displayChapterTitle(
+        book!,
         volume!,
         chapter!,
         rawTitle: _title.text,

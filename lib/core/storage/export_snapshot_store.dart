@@ -133,6 +133,7 @@ class ExportSnapshotStore {
     final volumes = <String>{};
     final chapters = <String>{};
     try {
+      int followGlobalChapters = 0;
       for (final entry in _list(data['volumes'])) {
         final volume = _object(entry);
         _uniqueId(volume['id'], volumes);
@@ -141,7 +142,19 @@ class ExportSnapshotStore {
           _uniqueId(_object(member)['id'], chapters);
         }
         _checkNumbering(volume['numbering'], members.length);
+        final bool followGlobal = switch (volume['numberingMode']) {
+          null => volume['numbering'] is Map<String, dynamic> &&
+              volume['numbering']['enabled'] != true,
+          'follow-global' => true,
+          'independent' || 'none' => false,
+          _ => throw const FormatException('编号模式无效，已停止导出'),
+        };
+        if (followGlobal) {
+          followGlobalChapters += members.length;
+        }
       }
+      // 全局编号按「跟随全局」卷的章数合计校验（全书连续编号）。
+      _checkNumbering(data['globalNumbering'], followGlobalChapters);
       // Parsing only after validation prevents the legacy model's whereType
       // compatibility filters from hiding corrupt/missing chapter entries.
       return BookIndex.fromJson(data);

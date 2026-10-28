@@ -4,6 +4,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../core/chapter_numbering.dart';
+import '../core/i18n/i18n.dart';
 import '../core/models.dart';
 import '../core/text/composing.dart';
 import '../core/text/word_count.dart';
@@ -12,8 +13,8 @@ import '../state/workspace_controller.dart';
 import 'context_menu.dart';
 import 'export_notice.dart';
 import 'menu_surface.dart';
+import 'numbering_settings_dialog.dart';
 import 'theme/tokens.dart';
-import 'volume_settings_dialog.dart';
 
 /// 页面隐藏/导航前与内联卷名握手；value 为 IME 组合锁，不复制或清除草稿。
 class ChapterPaneDraft extends ValueNotifier<bool> {
@@ -139,7 +140,7 @@ class _ChapterPaneState extends State<ChapterPane> {
         _editingId = null;
         _nameError = null;
       } else {
-        _nameError = w.error ?? '未保存，请重试';
+        _nameError = w.error ?? t(context, 'volume.save.failed');
       }
     });
     if (!ok) _nameFocus.requestFocus();
@@ -206,16 +207,51 @@ class _ChapterPaneState extends State<ChapterPane> {
         controller: _scroll,
         padding: const EdgeInsets.fromLTRB(10, 12, 10, 24),
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              book.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: bodyTextColor(context),
+          GestureDetector(
+            onSecondaryTapDown: (d) =>
+                _bookMenu(context, d.globalPosition),
+            onLongPressStart: (d) => _bookMenu(context, d.globalPosition),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      book.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: bodyTextColor(context),
+                      ),
+                    ),
+                  ),
+                  Builder(
+                    builder: (buttonContext) => Tooltip(
+                      message: t(context, 'sidebar.bookMenu'),
+                      child: IconButton(
+                        key: const ValueKey('book-menu-button'),
+                        icon: const Icon(FluentIcons.more, size: 14),
+                        onPressed:
+                            w.editingLocked || w.moving || _savingName
+                            ? null
+                            : () {
+                                final box =
+                                    buttonContext
+                                        .findRenderObject()! as
+                                    RenderBox;
+                                _bookMenu(
+                                  context,
+                                  box.localToGlobal(
+                                    Offset(0, box.size.height),
+                                  ),
+                                );
+                              },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -223,41 +259,38 @@ class _ChapterPaneState extends State<ChapterPane> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
-              '${book.volumes.length} 卷 · ${book.allChapters.length} 章 · ${formatWordCount(book.totalWordCount)}',
+              t(context, 'sidebar.stats', {
+                'volumes': '${book.volumes.length}',
+                'chapters': '${book.allChapters.length}',
+                'words': formatWordCount(book.totalWordCount),
+              }),
               style: TextStyle(fontSize: 10, color: mutedTextColor(context)),
             ),
           ),
-          const SizedBox(height: 10),
-          Button(
-            onPressed: w.editingLocked || w.moving || _savingName
-                ? null
-                : () => _appendVolume(context),
-            child: const Text('新建卷'),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           if (w.error != null || _nameError != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: InfoBar(
-                title: const Text('操作未完成'),
+                title: Text(t(context, 'sidebar.errorTitle')),
                 content: Text(_nameError ?? w.error!),
                 severity: InfoBarSeverity.error,
               ),
             ),
           if (book.volumes.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text('还没有卷。先新建一卷，再开始写作。'),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(t(context, 'sidebar.empty')),
             ),
           if (w.moving) ...[
             Text(
               w.moveMode == MoveMode.volumes
-                  ? '卷移动：拖动握柄到卷间落点'
-                  : '章节移动：拖动握柄到章间或卷标题',
+                  ? t(context, 'sidebar.moveVolumeHint')
+                  : t(context, 'sidebar.moveChapterHint'),
             ),
             Button(
               onPressed: w.editingLocked ? null : w.exitMove,
-              child: const Text('完成移动'),
+              child: Text(t(context, 'sidebar.finishMove')),
             ),
           ],
           if (w.moveMode == MoveMode.volumes) _gap(null, 0),
@@ -292,7 +325,9 @@ class _ChapterPaneState extends State<ChapterPane> {
                 child: Row(
                   children: [
                     Tooltip(
-                      message: open ? '折叠卷' : '展开卷',
+                      message: open
+                          ? t(context, 'sidebar.collapseVolume')
+                          : t(context, 'sidebar.expandVolume'),
                       child: IconButton(
                         key: ValueKey('toggle-volume-${volume.id}'),
                         icon: Icon(
@@ -334,7 +369,13 @@ class _ChapterPaneState extends State<ChapterPane> {
                               ),
                             )
                           : Text(
-                              displayVolumeTitle(volume),
+                              displayVolumeTitle(
+                                volume,
+                                untitledLabel: t(
+                                  context,
+                                  'common.untitledVolume',
+                                ),
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -369,9 +410,9 @@ class _ChapterPaneState extends State<ChapterPane> {
               child: Align(
                 alignment: Alignment.center,
                 child: Tooltip(
-                  message: '新建章节',
+                  message: t(context, 'sidebar.newChapter'),
                   child: Semantics(
-                    label: '新建章节',
+                    label: t(context, 'sidebar.newChapter'),
                     button: true,
                     child: IconButton(
                       key: ValueKey('add-chapter-${volume.id}'),
@@ -438,9 +479,11 @@ class _ChapterPaneState extends State<ChapterPane> {
                   children: [
                     Text(
                       displayChapterTitle(
+                        w.book,
                         volume,
                         chapter,
                         rawTitle: active ? w.editor.title.text : null,
+                        untitledLabel: t(context, 'common.untitledChapter'),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -450,7 +493,7 @@ class _ChapterPaneState extends State<ChapterPane> {
                             ? FontWeight.w600
                             : FontWeight.normal,
                         color:
-                            !volume.numbering.enabled &&
+                            effectiveChapterNumbering(w.book, volume) == null &&
                                 (active ? w.editor.title.text : chapter.title)
                                     .trim()
                                     .isEmpty
@@ -633,8 +676,16 @@ class _ChapterPaneState extends State<ChapterPane> {
           ),
           child: Text(
             chapter == null
-                ? displayVolumeTitle(volume)
-                : displayChapterTitle(volume, chapter),
+                ? displayVolumeTitle(
+                    volume,
+                    untitledLabel: t(context, 'common.untitledVolume'),
+                  )
+                : displayChapterTitle(
+                    w.book,
+                    volume,
+                    chapter,
+                    untitledLabel: t(context, 'common.untitledChapter'),
+                  ),
             style: TextStyle(color: bodyTextColor(context), fontSize: 13),
           ),
         ),
@@ -642,7 +693,7 @@ class _ChapterPaneState extends State<ChapterPane> {
         onDragUpdate: (d) => _dragPosition = d.globalPosition,
         onDragEnd: (_) => _stopDrag(),
         child: Tooltip(
-          message: '拖动握柄移动；方向键排序，Ctrl+方向键跨卷',
+          message: t(context, 'sidebar.gripHint'),
           child: IconButton(
             key: ValueKey(key),
             icon: const Icon(FluentIcons.gripper_dots_vertical, size: 16),
@@ -657,15 +708,43 @@ class _ChapterPaneState extends State<ChapterPane> {
     if (!await _submitName() || !context.mounted) return;
     await _ask(
       context,
-      '新建卷',
-      '卷名（留空为未命名卷）',
+      t(context, 'volume.new.title'),
+      t(context, 'volume.new.hint'),
       onSave: (name) async {
+        final saveFailed = t(context, 'volume.save.failed');
         final ok = await w.change(
           () => w.library.appendVolume(book, title: name),
         );
-        if (!ok) throw StateError(w.error ?? '新卷未保存，请重试');
+        if (!ok) {
+          throw StateError(w.error ?? saveFailed);
+        }
       },
     );
+  }
+
+  /// 书名菜单（任务3）：取代侧栏顶部独立的「新建卷」按钮。
+  /// 菜单项：新建卷（复用 [_appendVolume]）、自动章节序号设置（任务4
+  /// 全局层入口）；书名行右键/长按与右端 more 按钮打开同一菜单，
+  /// 预留后续扩展（在此追加 MenuAction 即可）。
+  Future<void> _bookMenu(BuildContext context, Offset position) async {
+    if (w.editingLocked || w.moving || w.editor.isComposing || _composing) {
+      return;
+    }
+    final action = await showContextMenu(context, position, [
+      MenuAction('newVolume', t(context, 'sidebar.newVolume')),
+      MenuAction('numbering', t(context, 'sidebar.numberingSettings')),
+    ]);
+    if (!context.mounted) return;
+    switch (action) {
+      case 'newVolume':
+        await _appendVolume(context);
+      case 'numbering':
+        if (!await _submitName() || !context.mounted) return;
+        await showDialog<bool>(
+          context: context,
+          builder: (_) => NumberingSettingsDialog(workspace: w),
+        );
+    }
   }
 
   Future<void> _appendChapter(Volume volume) async {
@@ -687,13 +766,39 @@ class _ChapterPaneState extends State<ChapterPane> {
     }
     final exporter = widget.exporter;
     final volumeId = volume.id;
+    final mode = volume.numberingMode;
     final action = await showContextMenu(context, position, [
-      const MenuAction('rename', '重命名'),
-      const MenuAction('add', '在本卷新建章'),
-      const MenuAction('settings', '卷设置'),
-      const MenuAction('move', '移动'),
-      if (exporter != null) const MenuAction('export', '导出本卷'),
-      const MenuAction('delete', '删除卷'),
+      MenuAction('rename', t(context, 'volume.rename')),
+      MenuAction('add', t(context, 'volume.newChapter')),
+      MenuAction(
+        'numbering',
+        t(context, 'volume.numbering'),
+        children: [
+          MenuAction(
+            'numbering-follow-global',
+            t(context, 'volume.numbering.followGlobal'),
+            checked: mode == VolumeNumberingMode.followGlobal,
+          ),
+          MenuAction(
+            'numbering-independent',
+            t(context, 'volume.numbering.independent'),
+            checked: mode == VolumeNumberingMode.independent,
+          ),
+          MenuAction(
+            'numbering-none',
+            t(context, 'volume.numbering.none'),
+            checked: mode == VolumeNumberingMode.none,
+          ),
+          MenuAction(
+            'numbering-edit',
+            t(context, 'volume.numbering.editRule'),
+            enabled: mode == VolumeNumberingMode.independent,
+          ),
+        ],
+      ),
+      MenuAction('move', t(context, 'volume.move')),
+      if (exporter != null) MenuAction('export', t(context, 'volume.export')),
+      MenuAction('delete', t(context, 'volume.delete')),
     ]);
     if (!context.mounted) return;
     switch (action) {
@@ -705,19 +810,59 @@ class _ChapterPaneState extends State<ChapterPane> {
         await _appendChapter(volume);
       case 'export':
         if (exporter == null) return;
-        if (!await _submitName() || !mounted) return;
-        await _export(() => ExportTarget.volume(w.book.id, volumeId), '导出本卷');
-      case 'settings':
+        if (!await _submitName() || !context.mounted) return;
+        await _export(
+          () => ExportTarget.volume(w.book.id, volumeId),
+          t(context, 'volume.export'),
+        );
+      case 'numbering-follow-global':
+        await w.change(
+          () => w.library.setVolumeNumberingMode(
+            book,
+            volume,
+            VolumeNumberingMode.followGlobal,
+          ),
+        );
+      case 'numbering-independent':
+        // 选择「卷内独立编号」：先落模式（沿用/默认规则镜像开启），
+        // 再直接打开规则编辑浮窗精调；取消编辑也保持该模式。
+        final ok = await w.change(
+          () => w.library.setVolumeNumberingMode(
+            book,
+            volume,
+            VolumeNumberingMode.independent,
+          ),
+        );
+        if (ok && context.mounted) {
+          await showDialog<bool>(
+            context: context,
+            builder: (_) =>
+                NumberingSettingsDialog(workspace: w, volume: volume),
+          );
+        }
+      case 'numbering-none':
+        await w.change(
+          () => w.library.setVolumeNumberingMode(
+            book,
+            volume,
+            VolumeNumberingMode.none,
+          ),
+        );
+      case 'numbering-edit':
         if (!await _submitName() || !context.mounted) return;
         await showDialog<bool>(
           context: context,
-          builder: (_) => VolumeSettingsDialog(workspace: w, volume: volume),
+          builder: (_) =>
+              NumberingSettingsDialog(workspace: w, volume: volume),
         );
       case 'delete':
         if (!await _submitName() || !context.mounted) return;
         if (await _confirm(
           context,
-          '删除「${volume.title}」及其 ${volume.chapters.length} 章？',
+          t(context, 'volume.delete.confirm', {
+            'name': volume.title,
+            'count': '${volume.chapters.length}',
+          }),
         )) {
           await w.change(() => w.library.deleteVolume(book, volume));
         }
@@ -736,46 +881,53 @@ class _ChapterPaneState extends State<ChapterPane> {
     final exporter = widget.exporter;
     final chapterId = chapter.id;
     final action = await showContextMenu(context, position, [
-      const MenuAction('rename', '重命名章'),
-      const MenuAction('move', '移动'),
-      if (exporter != null) const MenuAction('export', '导出本章'),
-      const MenuAction('delete', '删除章'),
+      MenuAction('rename', t(context, 'chapter.rename')),
+      MenuAction('move', t(context, 'chapter.move')),
+      if (exporter != null) MenuAction('export', t(context, 'chapter.export')),
+      MenuAction('delete', t(context, 'chapter.delete')),
     ]);
     if (!context.mounted) return;
     switch (action) {
       case 'rename':
         await _ask(
           context,
-          '重命名章',
-          '章名',
+          t(context, 'chapter.rename'),
+          t(context, 'chapter.hint'),
           initial: w.chapter?.id == chapter.id
               ? w.editor.title.text
               : chapter.title,
           onSave: (name) async {
+            final titleSaveFailed = t(context, 'chapter.titleSaveFailed');
+            final saveFailed = t(context, 'chapter.save.failed');
             final ok = await w.change(() async {
               if (w.chapter?.id == chapter.id) {
                 w.editor.title.text = name;
                 if (!await w.editor.flush()) {
-                  throw StateError(w.editor.errorMessage ?? '标题未保存');
+                  throw StateError(w.editor.errorMessage ?? titleSaveFailed);
                 }
               } else {
                 await w.library.renameChapter(book, chapter, name);
               }
             });
-            if (!ok) throw StateError(w.error ?? '章名未保存，请重试');
+            if (!ok) {
+              throw StateError(w.error ?? saveFailed);
+            }
           },
         );
       case 'move':
         await _enterMove(false);
       case 'export':
         if (exporter == null) return;
-        if (!await _submitName() || !mounted) return;
+        if (!await _submitName() || !context.mounted) return;
         await _export(
           () => ExportTarget.chapter(w.book.id, volume.id, chapterId),
-          '导出本章',
+          t(context, 'chapter.export'),
         );
       case 'delete':
-        if (await _confirm(context, '删除「${chapter.title}」？')) {
+        if (await _confirm(
+          context,
+          t(context, 'chapter.delete.confirm', {'name': chapter.title}),
+        )) {
           await w.change(() => w.library.deleteChapter(book, volume, chapter));
         }
     }
@@ -786,28 +938,32 @@ class _ChapterPaneState extends State<ChapterPane> {
     final exporter = widget.exporter;
     if (exporter == null) return;
     if (exporter.busy) {
-      await _showNotice(label, '正在导出，请稍候。');
+      await _showNotice(label, t(context, 'export.busy'));
       return;
     }
     try {
       final file = await exporter.export(target());
       if (!mounted) return;
       if (file == null) {
-        await _showNotice(label, exporter.message ?? '暂无章节可导出');
+        await _showNotice(
+          label,
+          exporter.message ?? t(context, 'export.empty'),
+        );
         return;
       }
       final dir = file.parent.path;
       final reveal = widget.revealPath;
+      final openDirFailed = t(context, 'export.openDir.failed');
       await showExportNotice(
         context,
-        title: '$label完成',
-        message: '已导出为纯文本文件。',
+        title: t(context, 'export.done.title', {'label': label}),
+        message: t(context, 'export.done.body'),
         filePath: file.path,
         openDirectory: reveal == null
             ? null
             : (_) async {
                 if (!await reveal(dir)) {
-                  throw StateError('系统没有打开该文件夹');
+                  throw StateError(openDirFailed);
                 }
               },
       );
@@ -815,7 +971,7 @@ class _ChapterPaneState extends State<ChapterPane> {
       if (!mounted) return;
       await showExportNotice(
         context,
-        title: '$label失败',
+        title: t(context, 'export.failed.title', {'label': label}),
         message: '$error',
         onRetry: () {
           if (mounted) _export(target, label);
@@ -855,7 +1011,7 @@ Future<void> _confirmMessage(
       FilledButton(
         key: const ValueKey('export-notice-close'),
         onPressed: () => Navigator.pop(context),
-        child: const Text('知道了'),
+        child: Text(t(context, 'common.ok')),
       ),
     ],
   ),
@@ -866,15 +1022,15 @@ Future<bool> _confirm(BuildContext context, String title) async =>
       context: context,
       builder: (context) => ContentDialog(
         title: Text(title),
-        content: const Text('会先保存当前草稿，正文移入 trash，不会直接永久删除。'),
+        content: Text(t(context, 'delete.confirm.body')),
         actions: [
           Button(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(t(context, 'common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
+            child: Text(t(context, 'common.delete')),
           ),
         ],
       ),
@@ -971,11 +1127,11 @@ class _NameDialogState extends State<_NameDialog> {
             onPressed: _saving || composing
                 ? null
                 : () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(t(context, 'common.cancel')),
           ),
           FilledButton(
             onPressed: _saving || composing ? null : submit,
-            child: const Text('确定'),
+            child: Text(t(context, 'common.confirm')),
           ),
         ],
       ),

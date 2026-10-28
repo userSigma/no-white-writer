@@ -5,6 +5,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import 'app_context.dart';
 import 'core/chapter_numbering.dart';
+import 'core/i18n/i18n.dart';
 import 'core/models.dart';
 import 'core/logging/app_logger.dart';
 import 'core/platform/platform_services.dart';
@@ -33,6 +34,11 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
   AppThemeData? _customTheme;
   String? _exitMessage;
 
+  /// 语言切换即时生效：监听 i18n 并重建（builder 里的 I18nScope 由此更新）。
+  void _onLanguageChanged() {
+    if (mounted) setState(() {});
+  }
+
   AppContext get app => widget.app;
 
   @override
@@ -44,6 +50,7 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
     });
     _applyThemeMode();
     app.settings.addListener(_applyThemeMode);
+    app.i18n.addListener(_onLanguageChanged);
     app.editor.addListener(_syncTitle);
     app.library.addListener(_syncTitle);
     _lifecycle = AppLifecycleListener(
@@ -57,6 +64,7 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
   void dispose() {
     _lifecycle.dispose();
     app.settings.removeListener(_applyThemeMode);
+    app.i18n.removeListener(_onLanguageChanged);
     app.editor.removeListener(_syncTitle);
     app.library.removeListener(_syncTitle);
     super.dispose();
@@ -102,6 +110,7 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
     final String? chapterTitle = editor.chapter == null || currentVolume == null
         ? null
         : displayChapterTitle(
+            editor.book!,
             currentVolume,
             editor.chapter!,
             rawTitle: editor.title.text,
@@ -214,7 +223,8 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
           ? buildFluentTheme(custom)
           : buildFluentTheme(AppThemeData.dark),
       themeMode: _themeMode,
-      locale: const Locale('zh'),
+      // 语言包切换即时生效：locale 跟随当前语言包（zh-CN → zh，en → en）。
+      locale: localeOfLanguageCode(app.i18n.currentCode),
       localizationsDelegates: FluentLocalizations.localizationsDelegates,
       supportedLocales: FluentLocalizations.supportedLocales,
       builder: (context, child) {
@@ -233,7 +243,12 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
         return LiveFluentThemeScope(
           themeData: buildFluentTheme(effective),
           appTheme: effective,
-          child: Stack(
+          // i18n scope：Navigator 与 overlay 路由（菜单/浮窗）都从这取词，
+          // 与 LiveFluentThemeScope 同层保证语言切换后弹层也换词。
+          child: I18nScope(
+            controller: app.i18n,
+            languageCode: app.i18n.currentCode,
+            child: Stack(
             fit: StackFit.expand,
             children: [
               ?child,
@@ -256,6 +271,7 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
                   ),
                 ),
             ],
+          ),
           ),
         );
       },

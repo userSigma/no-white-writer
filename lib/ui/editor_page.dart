@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart'
     show InputDecoration, Material, MaterialType, TextField;
 
 import '../app_context.dart';
+import '../core/chapter_numbering.dart';
 import '../core/models.dart';
 import '../core/text/word_count.dart';
 import '../state/editor_controller.dart';
@@ -266,7 +267,6 @@ class _EditorPageState extends State<EditorPage> {
             const Spacer(),
             SettingsMenuButton(
               app: widget.app,
-              upward: true,
               enabled: !blocked,
               beforeOpen: () async => _paneDraft.flush(),
             ),
@@ -527,13 +527,14 @@ class _EditorPageState extends State<EditorPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            if (workspace.volume!.numbering.enabled)
+                            if (chapterNumberLabel(
+                              workspace.book,
+                              workspace.volume!,
+                              workspace.chapter!.id,
+                            )
+                                case final label?)
                               Text(
-                                workspace.volume!.numbering.label(
-                                  workspace.volume!.chapters.indexWhere(
-                                    (c) => c.id == workspace.chapter!.id,
-                                  ),
-                                ),
+                                label,
                                 key: const ValueKey('chapter-number'),
                                 style: TextStyle(
                                   fontSize: 16,

@@ -4,6 +4,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import 'app.dart';
 import 'app_context.dart';
+import 'core/i18n/i18n.dart';
 import 'core/logging/app_logger.dart';
 import 'core/models.dart';
 import 'core/platform/platform_services.dart';
@@ -93,6 +94,19 @@ Future<void> main() async {
     settings: settingsController,
   );
 
+  // i18n：先扫描外部语言包（languages/*.json），再应用持久化的语言选择；
+  // 坏语言包逐个记日志跳过，不阻断启动。
+  final I18nController i18n = I18nController();
+  final List<String> languageErrors = await i18n.loadExternal(
+    Directory(paths.languagesDir),
+  );
+  for (final String error in languageErrors) {
+    AppLogger.instance.warn('i18n.pack.skipped', error);
+  }
+  if (!i18n.applySaved(settings.language)) {
+    AppLogger.instance.warn('i18n.language.unknown', settings.language);
+  }
+
   // 崩溃恢复必须在 library.load 之前：恢复后的正文长度会影响书架字数统计。
   final List<RecoveryRecord> recovered = <RecoveryRecord>[];
   final LibraryIndex rawLibrary = await libraryStore.load();
@@ -147,6 +161,7 @@ Future<void> main() async {
     settings: settingsController,
     library: library,
     editor: editor,
+    i18n: i18n,
     instanceLock: lock,
     recovered: restored,
   );
