@@ -48,7 +48,14 @@ Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath $zip
 数据默认在 `%APPDATA%\不白写作\`；`NWW_DATA_ROOT` 仅供隔离开发验收，不是正式启动问题的修复办法。
 环境细节与实测数据见 [环境记录](docs/env.md)，设计规格见 [计划](PLAN.md)。
 
-## 0.4.0+4 最新交付（2026-10-27）
+## 0.4.1+5 最新交付（2026-10-28）
+
+- CI/CD 流水线上线并完成首个自动发布：push/PR 触发格式 0 变化、analyze、flutter test 与 Windows 构建四道门禁（GitHub Actions）；推送 `v*` 标签自动构建、打包并发布 Release，本版即首个流水线产物。
+- 代码全量 `dart format` 重排并合入进行中的底层改动：新增 `lib/core/storage/bytes.dart`、`lib/core/storage/corrupt_file.dart`、`lib/core/text/composing.dart`，移除 `lib/ui/catalog_page.dart`（26 文件 +230/−746）。
+- 门禁：76 个 Dart 文件格式 0 变化，analyze 无问题，**281 项测试全部通过**（本地与 Actions 一致）。
+- [完整 Windows ZIP（GitHub Release）](https://github.com/userSigma/no-white-writer/releases/tag/v0.4.1)：**25,702,040 字节**，附同名 `.sha256` 校验文件；必须完整解压后运行。SHA-256：`B4353C57D607D57942EA06D33881362FD02655867DC174CE194B790B6ED4E8C8`。
+
+## 0.4.0+4 历史验证（2026-10-27）
 
 - 无框菜单与扁平卷章目录、侧栏内底部按钮／完整隐藏／过渡动画、真正空标题、设置子选单、章／卷／书 TXT 导出均已实现；保留 0.2 样式及纯白／纯黑内容底色。
 - 新鲜门禁：71 个 Dart 文件格式检查 0 变化，analyze 无问题，**280 项测试全部通过**，Windows x64 release 60.8 s；含真实菜单／拖放、IME 组合态、在途保存、失败清理与重启恢复。
