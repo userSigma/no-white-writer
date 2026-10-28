@@ -25,7 +25,8 @@ void main() {
   test('无编号空章显示占位而不污染原名', () {
     final chapter = ChapterMeta(id: 'c', title: '', order: 0);
     final volume = Volume(id: 'v', title: '', order: 0, chapters: [chapter]);
-    expect(displayChapterTitle(volume, chapter), '未命名章节');
+    final book = BookIndex(id: 'b', title: '', volumes: [volume]);
+    expect(displayChapterTitle(book, volume, chapter), '未命名章节');
     expect(chapter.title, '');
     expect(volume.title, '');
   });
@@ -38,8 +39,10 @@ void main() {
       order: 0,
       chapters: [chapter],
       numbering: const ChapterNumbering(enabled: true),
+      numberingMode: VolumeNumberingMode.independent,
     );
-    expect(displayChapterTitle(volume, chapter), '第1章');
+    final book = BookIndex(id: 'b', title: '', volumes: [volume]);
+    expect(displayChapterTitle(book, volume, chapter), '第1章');
     expect(chapter.title, '');
   });
 

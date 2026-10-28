@@ -131,7 +131,8 @@ class ChapterMoveStore {
       final target = paths.chapterFile(bookId, targetId, chapterId);
       final keep = owners.single == sourceId ? source : target;
       final discard = owners.single == sourceId ? target : source;
-      // 先核验所有现有文件，避免清理了一半才发现另一份被外部改写。
+      // 先核验所有现有正文与备份，避免清理了一半才发现另一份被外部改写。
+      // 临时文件可能正是中断写入的半成品；保留端恢复完成后清理，不要求其字节完整。
       for (final f in [source, target]) {
         if (await f.exists()) await _verify(f, txt);
         final b = File('${f.path}.bak');
@@ -139,12 +140,8 @@ class ChapterMoveStore {
           if (bak == null) throw StateError('出现记录外的备份文件：${b.path}');
           await _verify(b, bak);
         }
-        final t = File('${f.path}.tmp');
-        if (await t.exists()) await _verify(t, txt);
-        final bt = File('${f.path}.bak.tmp');
-        if (await bt.exists()) {
-          if (bak == null) throw StateError('存在记录外的备份临时文件');
-          await _verify(bt, bak);
+        if (bak == null && await File('${f.path}.bak.tmp').exists()) {
+          throw StateError('存在记录外的备份临时文件');
         }
       }
       if (!await file.exists()) await tmp.rename(file.path);

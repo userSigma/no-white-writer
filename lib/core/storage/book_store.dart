@@ -11,6 +11,14 @@ import 'chapter_store.dart';
 import 'chapter_move_store.dart';
 import 'corrupt_file.dart';
 
+void _requireObjectEntries(Map<String, dynamic> json, String key) {
+  final Object? entries = json[key];
+  if (entries is List<dynamic> &&
+      entries.any((Object? entry) => entry is! Map<String, dynamic>)) {
+    throw FormatException('book.json 的 $key 含非法条目');
+  }
+}
+
 /// `book.json` 的读写与从磁盘重建索引（PLAN.md §4.7 第 1–4 步）。
 class BookStore {
   BookStore(
@@ -35,9 +43,15 @@ class BookStore {
         if (decoded is! Map<String, dynamic>) {
           throw const FormatException('book.json 顶层不是对象');
         }
+        _requireObjectEntries(decoded, 'volumes');
+        final List<dynamic> volumes =
+            decoded['volumes'] as List<dynamic>? ?? <dynamic>[];
+        for (final Object? volume in volumes) {
+          _requireObjectEntries(volume as Map<String, dynamic>, 'chapters');
+        }
         final BookIndex book = BookIndex.fromJson(decoded);
-        if (book.id.isEmpty) {
-          throw const FormatException('book.json 缺 id');
+        if (book.id != summary.id) {
+          throw const FormatException('book.json 的书籍 ID 与目录不符');
         }
         return book;
       } catch (error) {

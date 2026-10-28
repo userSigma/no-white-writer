@@ -126,7 +126,7 @@ class LibraryController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     try {
-      _index = await libraryStore.load();
+      _index = await libraryStore.loadOrRebuild(bookStore);
       error = null;
     } catch (e) {
       error = '$e';
@@ -377,7 +377,8 @@ class LibraryController extends ChangeNotifier {
     final chapters = {for (final c in book.allChapters) c.id: c};
     book
       ..title = next.title
-      ..notes = next.notes;
+      ..notes = next.notes
+      ..globalNumbering = next.globalNumbering;
     final ordered = <Volume>[];
     for (final v in next.volumes) {
       final current = volumes[v.id] ?? v;
@@ -394,7 +395,8 @@ class LibraryController extends ChangeNotifier {
       current
         ..title = v.title
         ..order = v.order
-        ..numbering = v.numbering;
+        ..numbering = v.numbering
+        ..numberingMode = v.numberingMode;
       current.chapters
         ..clear()
         ..addAll(list);
@@ -429,8 +431,9 @@ class LibraryController extends ChangeNotifier {
     final next = _copy(book);
     final target = next.volumes.where((v) => v.id == volume.id).firstOrNull;
     if (target == null) throw StateError('目标卷不属于当前作品');
-    if (target.numbering.enabled) {
-      target.numbering.validate(target.chapters.length + 1);
+    final ChapterNumbering? rule = effectiveChapterNumbering(next, target);
+    if (rule != null) {
+      rule.validate(_numberedChapterCount(next, target) + 1);
     }
     final chapter = ChapterMeta(
       id: newId(),
@@ -486,7 +489,88 @@ class LibraryController extends ChangeNotifier {
   ) async {
     rule.validate(volume.chapters.length);
     final next = _copy(book);
-    next.volumes.firstWhere((v) => v.id == volume.id).numbering = rule;
+    final target = next.volumes.firstWhere((v) => v.id == volume.id);
+    target.numbering = rule;
+    // legacy 调用方只设规则、不设两层模式：启用规则即进入卷内独立编号，
+    // 关闭后回到跟随全局（显式「不编号」的卷保持不编号），
+    // 使旧接口与新两层编号行为保持一致。
+    target.numberingMode = rule.enabled
+        ? VolumeNumberingMode.independent
+        : target.numberingMode == VolumeNumberingMode.none
+        ? VolumeNumberingMode.none
+        : VolumeNumberingMode.followGlobal;
+    await _commit(book, next);
+  }
+
+  /// 设置卷级编号模式（两层编号的卷层）。
+  ///
+  /// 进入独立编号时卷规则必须对现有章数成立；legacy 的
+  /// `numbering.enabled` 与模式保持镜像（independent ⇔ true），
+  /// 旧版本程序读同一份数据时行为仍然自洽。
+  Future<void> setVolumeNumberingMode(
+    BookIndex book,
+    Volume volume,
+    VolumeNumberingMode mode,
+  ) => _mutate(() => _setVolumeNumberingMode(book, volume, mode));
+
+  Future<void> _setVolumeNumberingMode(
+    BookIndex book,
+    Volume volume,
+    VolumeNumberingMode mode,
+  ) async {
+    final next = _copy(book);
+    final target = next.volumes.firstWhere((v) => v.id == volume.id);
+    switch (mode) {
+      case VolumeNumberingMode.independent:
+        target.numbering.validate(target.chapters.length);
+        target.numbering = _withEnabled(target.numbering, true);
+      case VolumeNumberingMode.followGlobal:
+        final ChapterNumbering? global = effectiveChapterNumbering(
+          next,
+          target,
+        );
+        if (global != null) global.validate(globalNumberingChapterCount(next));
+        target.numbering = _withEnabled(target.numbering, false);
+      case VolumeNumberingMode.none:
+        target.numbering = _withEnabled(target.numbering, false);
+    }
+    target.numberingMode = mode;
+    await _commit(book, next);
+  }
+
+  /// 取号计数：卷内独立 → 本卷章数；跟随全局 → 参与全局编号的章总数。
+  /// （新章校验在此基础上 +1。）
+  static int _numberedChapterCount(BookIndex book, Volume volume) =>
+      volume.numberingMode == VolumeNumberingMode.independent
+      ? volume.chapters.length
+      : globalNumberingChapterCount(book);
+
+  static ChapterNumbering _withEnabled(ChapterNumbering rule, bool enabled) =>
+      ChapterNumbering(
+        enabled: enabled,
+        prefix: rule.prefix,
+        suffix: rule.suffix,
+        style: rule.style,
+        padding: rule.padding,
+        start: rule.start,
+        step: rule.step,
+      );
+
+  /// 设置书籍级「全局自动章节序号」配置（两层编号的全局层）。
+  ///
+  /// 校验口径与解析一致：跟随全局的卷合并使用全书连续序号，
+  /// 因此规则必须对参与全局编号的章总数成立。
+  Future<void> setGlobalNumbering(BookIndex book, ChapterNumbering rule) =>
+      _mutate(() => _setGlobalNumbering(book, rule));
+
+  Future<void> _setGlobalNumbering(
+    BookIndex book,
+    ChapterNumbering rule,
+  ) async {
+    if (rule.enabled) {
+      rule.validate(globalNumberingChapterCount(book));
+    }
+    final next = _copy(book)..globalNumbering = rule;
     await _commit(book, next);
   }
 
@@ -520,13 +604,17 @@ class LibraryController extends ChangeNotifier {
     int index = insertionIndex;
     if (source.id == target.id && index > oldIndex) index--;
     if (source.id == target.id && index == oldIndex) return;
-    if (target.numbering.enabled) {
-      target.numbering.validate(
-        target.chapters.length + (source.id == target.id ? 0 : 1),
-      );
-    }
     source.chapters.remove(chapter);
     target.chapters.insert(index, chapter);
+    // 校验口径与取号一致：移动后目标卷的编号范围必须仍合法。
+    // （卷内独立 → 目标卷章数；跟随全局 → 参与全局编号的章总数。）
+    final ChapterNumbering? targetRule = effectiveChapterNumbering(
+      next,
+      target,
+    );
+    if (targetRule != null) {
+      targetRule.validate(_numberedChapterCount(next, target));
+    }
     _normalize(next);
     if (source.id == target.id) {
       await _commit(book, next);

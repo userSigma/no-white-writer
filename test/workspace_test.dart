@@ -87,10 +87,7 @@ void main() {
     h.app.editor.title.text = '删除前标题';
     h.app.editor.text.text = '删除前正文';
     expect(
-      await w.change(
-        () => h.app.library.deleteChapter(book, volume, second),
-        deletingIds: <String>{second.id},
-      ),
+      await w.change(() => h.app.library.deleteChapter(book, volume, second)),
       isTrue,
     );
     expect(w.chapter?.id, third.id);
@@ -99,18 +96,12 @@ void main() {
       isFalse,
     );
     expect(
-      await w.change(
-        () => h.app.library.deleteChapter(book, volume, third),
-        deletingIds: <String>{third.id},
-      ),
+      await w.change(() => h.app.library.deleteChapter(book, volume, third)),
       isTrue,
     );
     expect(w.chapter?.id, first.id);
     expect(
-      await w.change(
-        () => h.app.library.deleteChapter(book, volume, first),
-        deletingIds: <String>{first.id},
-      ),
+      await w.change(() => h.app.library.deleteChapter(book, volume, first)),
       isTrue,
     );
     expect(w.chapter, isNull);
@@ -133,18 +124,12 @@ void main() {
     final ChapterMeta extra = await h.app.library.appendChapter(book, second);
     final WorkspaceController w = await workspace(h, book);
     expect(
-      await w.change(
-        () => h.app.library.deleteVolume(book, first),
-        deletingIds: first.chapters.map((ChapterMeta c) => c.id).toSet(),
-      ),
+      await w.change(() => h.app.library.deleteVolume(book, first)),
       isTrue,
     );
     expect(w.chapter?.id, chapter.id);
     expect(
-      await w.change(
-        () => h.app.library.deleteChapter(book, second, extra),
-        deletingIds: <String>{extra.id},
-      ),
+      await w.change(() => h.app.library.deleteChapter(book, second, extra)),
       isTrue,
     );
     expect(w.chapter?.id, chapter.id);

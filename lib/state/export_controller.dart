@@ -90,12 +90,16 @@ class ExportController extends ChangeNotifier {
 
   Future<List<({String title, String text})>> _readVolume(
     ExportBookSession session,
+    BookIndex book,
     Volume volume,
   ) async {
     final chapters = <({String title, String text})>[];
     for (final chapter in volume.chapters) {
       final text = await session.readChapter(volume.id, chapter.id);
-      chapters.add((title: displayChapterTitle(volume, chapter), text: text));
+      chapters.add((
+        title: displayChapterTitle(book, volume, chapter),
+        text: text,
+      ));
     }
     return chapters;
   }
@@ -116,14 +120,14 @@ class ExportController extends ChangeNotifier {
         return service.exportChapter(
           bookTitle: book.title,
           volumeTitle: displayVolumeTitle(volume),
-          chapterTitle: displayChapterTitle(volume, chapter),
+          chapterTitle: displayChapterTitle(book, volume, chapter),
           text: text,
           customDir: customDir,
         );
       case ExportScope.volume:
         final volume = book.volumes.firstWhere((v) => v.id == target.volumeId);
         if (volume.chapters.isEmpty) return null;
-        final chapters = await _readVolume(session, volume);
+        final chapters = await _readVolume(session, book, volume);
         return service.exportVolume(
           bookTitle: book.title,
           volumeTitle: displayVolumeTitle(volume),
@@ -142,7 +146,7 @@ class ExportController extends ChangeNotifier {
         for (final volume in book.volumes) {
           volumes.add((
             volumeTitle: displayVolumeTitle(volume),
-            chapters: await _readVolume(session, volume),
+            chapters: await _readVolume(session, book, volume),
           ));
         }
         return service.exportBook(

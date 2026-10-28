@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 
@@ -5,10 +7,24 @@ import 'theme/tokens.dart';
 import 'menu_surface.dart';
 
 class MenuAction {
-  const MenuAction(this.id, this.label, {this.enabled = true});
+  const MenuAction(
+    this.id,
+    this.label, {
+    this.enabled = true,
+    this.checked = false,
+    this.children,
+  });
   final String id;
   final String label;
   final bool enabled;
+
+  /// 当前选中项（单选三态等）：渲染为前导勾选。
+  final bool checked;
+
+  /// 子菜单：点击不直接返回，先在项右侧展开下一级；子级返回的 id
+  /// 会作为本菜单的结果继续向外传递。
+  final List<MenuAction>? children;
+  bool get hasChildren => children != null && children!.isNotEmpty;
 }
 
 /// 真正的指针锚定菜单；透明模态屏障仍拦截背景，边界内可滚动。
@@ -83,6 +99,7 @@ class _Menu extends StatefulWidget {
 class _MenuState extends State<_Menu> {
   late int selected;
   final _scroll = ScrollController();
+  final _node = FocusNode();
   bool _keyboard = true;
 
   @override
@@ -94,6 +111,7 @@ class _MenuState extends State<_Menu> {
   @override
   void dispose() {
     _scroll.dispose();
+    _node.dispose();
     super.dispose();
   }
 
@@ -116,11 +134,46 @@ class _MenuState extends State<_Menu> {
     }
   }
 
+  /// 子级菜单的锚点：本项右缘外侧（容器坐标换算为全局坐标）。
+  Offset _submenuAnchor(int i) {
+    final box = context.findRenderObject();
+    if (box is RenderBox && box.attached) {
+      final topLeft = box.localToGlobal(Offset.zero);
+      final double scrollOffset = _scroll.hasClients ? _scroll.offset : 0.0;
+      return Offset(
+        topLeft.dx + box.size.width + 2,
+        topLeft.dy + 5 + i * 38.0 - scrollOffset,
+      );
+    }
+    return Offset.zero;
+  }
+
+  Future<void> _activate(int i) async {
+    final action = widget.actions[i];
+    if (action.hasChildren) {
+      final String? sub = await showContextMenu(
+        context,
+        _submenuAnchor(i),
+        action.children!,
+      );
+      if (!mounted) return;
+      if (sub != null) {
+        Navigator.pop(context, sub);
+      } else {
+        // 子级被点外/关闭：本菜单保持打开，继续支持键盘导航。
+        _node.requestFocus();
+      }
+      return;
+    }
+    Navigator.pop(context, action.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = FluentTheme.of(context);
     final bg = theme.menuColor, fg = bodyTextColor(context);
     return Focus(
+      focusNode: _node,
       autofocus: true,
       onKeyEvent: (_, event) {
         if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
@@ -142,7 +195,7 @@ class _MenuState extends State<_Menu> {
         }
         if (event.logicalKey == LogicalKeyboardKey.enter) {
           if (selected >= 0 && widget.actions[selected].enabled) {
-            Navigator.pop(context, widget.actions[selected].id);
+            unawaited(_activate(selected));
           }
           return KeyEventResult.handled;
         }
@@ -195,11 +248,35 @@ class _MenuState extends State<_Menu> {
                               : theme.resources.textFillColorDisabled,
                         ),
                         onPressed: widget.actions[i].enabled
-                            ? () => Navigator.pop(context, widget.actions[i].id)
+                            ? () => unawaited(_activate(i))
                             : null,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(widget.actions[i].label),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            children: <Widget>[
+                              SizedBox(
+                                width: 18,
+                                child: widget.actions[i].checked
+                                    ? Icon(
+                                        FluentIcons.check_mark,
+                                        size: 13,
+                                        color: accentColor(context),
+                                      )
+                                    : null,
+                              ),
+                              Expanded(child: Text(widget.actions[i].label)),
+                              if (widget.actions[i].hasChildren)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: Icon(
+                                    FluentIcons.chevron_right,
+                                    size: 11,
+                                    color:
+                                        theme.resources.textFillColorSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

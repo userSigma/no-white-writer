@@ -143,7 +143,7 @@ void main() {
     await finishWidget(tester, h);
   });
 
-  testWidgets('卷设置校验、预览和独立只读标题编号', (tester) async {
+  testWidgets('章节编号菜单校验、预览和卷内独立只读标题编号', (tester) async {
     final h = await widgetHarness(tester);
     final BookIndex book = (await tester.runAsync(() async {
       final s = await h.app.library.createBook('编号');
@@ -159,11 +159,22 @@ void main() {
     await finishIo(tester, until: () => editorReady(tester));
     await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
     await tester.pumpAndSettle();
-    expect(find.text('卷设置'), findsOneWidget);
-    await tester.tap(find.text('卷设置'));
+    // 卷菜单不再单独提供「卷设置」，编号入口收敛为「章节编号」子菜单。
+    expect(find.text('卷设置'), findsNothing);
+    expect(find.text('章节编号'), findsOneWidget);
+    await tester.tap(find.text('章节编号'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('numbering-enabled')));
-    await tester.pumpAndSettle();
+    expect(find.text('跟随全局编号'), findsOneWidget);
+    expect(find.text('卷内独立编号'), findsOneWidget);
+    expect(find.text('不编号'), findsOneWidget);
+    // 选择「卷内独立编号」先落模式，再直接打开规则浮窗。
+    await tester.tap(find.text('卷内独立编号'));
+    await finishIo(
+      tester,
+      until: () =>
+          find.byKey(const ValueKey('numbering-dialog')).evaluate().isNotEmpty,
+    );
+    expect(find.byKey(const ValueKey('numbering-dialog')), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('numbering-padding')),
       '3',
@@ -173,12 +184,12 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('numbering-step')), '0');
     await tester.pump();
     final save = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('save-volume-settings')),
+      find.byKey(const ValueKey('numbering-save')),
     );
     expect(save.onPressed, isNull);
     await tester.enterText(find.byKey(const ValueKey('numbering-step')), '1');
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('save-volume-settings')));
+    await tester.tap(find.byKey(const ValueKey('numbering-save')));
     await finishIo(
       tester,
       until: () =>

@@ -74,7 +74,6 @@ class WorkspaceController extends ChangeNotifier {
   /// 操作之前先落盘；删除当前目标必须先解除绑定，杜绝防抖/失焦复活文件。
   Future<bool> change(
     Future<void> Function() mutation, {
-    Set<String> deletingIds = const <String>{},
     String? Function()? selectAfter,
   }) {
     if (dragging || moving) return Future<bool>.value(false);
