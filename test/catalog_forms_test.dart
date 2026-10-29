@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
 import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/book_details_dialog.dart';
@@ -129,8 +130,8 @@ void main() {
     final book = (await tester.runAsync(() async {
       final summary = await h.app.library.createBook('占位');
       final b = await h.app.library.openBook(summary);
-      await h.app.library.renameVolume(b, b.volumes.first, '');
-      await h.app.library.renameChapter(b, b.allChapters.first, '');
+      await h.app.library.structure.renameVolume(b, b.volumes.first, '');
+      await h.app.library.structure.renameChapter(b, b.allChapters.first, '');
       return b;
     }))!;
     final v = book.volumes.first;
@@ -176,7 +177,7 @@ void main() {
       final book = (await tester.runAsync(() async {
         final s = await h.app.library.createBook('章菜单空名');
         final b = await h.app.library.openBook(s);
-        await h.app.library.appendChapter(b, b.volumes.first);
+        await h.app.library.structure.appendChapter(b, b.volumes.first);
         return b;
       }))!;
       final v = book.volumes.first;
@@ -215,7 +216,7 @@ void main() {
       final book = (await tester.runAsync(() async {
         final s = await h.app.library.createBook('章名失败草稿');
         final b = await h.app.library.openBook(s);
-        await h.app.library.appendChapter(b, b.volumes.first);
+        await h.app.library.structure.appendChapter(b, b.volumes.first);
         return b;
       }))!;
       final v = book.volumes.first;
@@ -410,7 +411,7 @@ void main() {
       await finishWidget(tester, h);
     });
   }
-  testWidgets('卷设置阻止非法整数和IME半成品，取消不改盘，失败可重试', (tester) async {
+  testWidgets('章节编号规则阻止非法整数和IME半成品，取消只保留模式，失败可重试', (tester) async {
     final writer = _FaultWriter(),
         h = await widgetHarness(tester, writer: writer);
     final book = (await tester.runAsync(() async {
@@ -428,15 +429,24 @@ void main() {
     Future<void> settings() async {
       await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('卷设置'));
+      await tester.tap(find.text('章节编号'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('卷内独立编号'));
+      await finishIo(
+        tester,
+        until: () => find
+            .byKey(const ValueKey('numbering-dialog'))
+            .evaluate()
+            .isNotEmpty,
+      );
     }
 
-    final save = find.byKey(const ValueKey('save-volume-settings')),
+    final save = find.byKey(const ValueKey('numbering-save')),
         step = find.byKey(const ValueKey('numbering-step')),
         prefix = find.byKey(const ValueKey('numbering-prefix'));
     await settings();
-    await tester.tap(find.byKey(const ValueKey('numbering-enabled')));
+    // 卷内独立编号在进入规则浮窗前已落盘（legacy enabled 镜像开启）。
+    expect(v.numberingMode, VolumeNumberingMode.independent);
     await tester.enterText(step, '0');
     await tester.pump();
     expect(tester.widget<FilledButton>(save).onPressed, isNull);
@@ -468,28 +478,31 @@ void main() {
     expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(v.numbering.enabled, isFalse);
+    // 取消规则编辑只丢弃草稿，卷菜单已选定的独立编号模式保留。
+    expect(v.numberingMode, VolumeNumberingMode.independent);
     expect(v.numbering.prefix, '第');
+    expect(v.numbering.step, 1);
     await settings();
-    await tester.tap(find.byKey(const ValueKey('numbering-enabled')));
+    await tester.enterText(prefix, 'No.');
+    await tester.pump();
     writer.fail = true;
     await tester.tap(save);
     await finishIo(
       tester,
       until: () =>
           find.textContaining('forms fault').evaluate().isNotEmpty &&
-          editorReady(tester),
+          find.byKey(const ValueKey('numbering-dialog')).evaluate().isNotEmpty,
     );
-    expect(v.numbering.enabled, isFalse);
+    expect(v.numbering.prefix, '第');
     writer.fail = false;
     await tester.tap(save);
     await finishIo(
       tester,
       until: () =>
-          find.byKey(const ValueKey('numbering-enabled')).evaluate().isEmpty &&
+          find.byKey(const ValueKey('numbering-dialog')).evaluate().isEmpty &&
           editorReady(tester),
     );
-    expect(v.numbering.enabled, isTrue);
+    expect(v.numbering.prefix, 'No.');
     await finishWidget(tester, h);
   });
 }

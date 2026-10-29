@@ -46,13 +46,13 @@ void main() {
   test('新章默认未命名，非法编号/溢出在创建文件前阻止', () async {
     final (h, summary, book, volume, chapter) = await setup();
     expect(chapter.title, '未命名章节');
-    await h.app.library.setNumbering(
+    await h.app.library.structure.setNumbering(
       book,
       volume,
       const ChapterNumbering(enabled: true, start: 999999999),
     );
     await expectLater(
-      h.app.library.appendChapter(book, volume),
+      h.app.library.structure.appendChapter(book, volume),
       throwsFormatException,
     );
     expect(volume.chapters, hasLength(1));
@@ -69,17 +69,17 @@ void main() {
   test('排序索引失败恢复内存，摘要失败不回滚已提交顺序', () async {
     final writer = FaultWriter();
     final (h, summary, book, volume, a) = await setup(writer: writer);
-    final b = await h.app.library.appendChapter(book, volume);
+    final b = await h.app.library.structure.appendChapter(book, volume);
     writer.failIndex = true;
     await expectLater(
-      h.app.library.moveChapter(book, volume, b, -1),
+      h.app.library.structure.relocateChapter(book, b.id, volume.id, 0),
       throwsA(isA<FileSystemException>()),
     );
     expect(volume.chapters.first.id, a.id);
     writer.failIndex = false;
     writer.failSummary = true;
     await expectLater(
-      h.app.library.moveChapter(book, volume, b, -1),
+      h.app.library.structure.relocateChapter(book, b.id, volume.id, 0),
       throwsA(isA<FileSystemException>()),
     );
     expect(volume.chapters.first.id, b.id);
@@ -89,7 +89,7 @@ void main() {
   test('跨卷先flush草稿，在途保存后绑定改到目标，后续保存不复活源', () async {
     final writer = FaultWriter();
     final (h, summary, book, source, chapter) = await setup(writer: writer);
-    final target = await h.app.library.appendVolume(book);
+    final target = await h.app.library.structure.appendVolume(book);
     h.app.editor.text.text = '第一稿';
     writer.holdIndex = true;
     final save = h.app.editor.saveNow();
@@ -97,7 +97,12 @@ void main() {
     h.app.editor.text.text = '最新草稿';
     final Future<bool> moving = Future<bool>.sync(
       () => h.app.editor.runStructure(book, () async {
-        await h.app.library.relocateChapter(book, chapter.id, target.id, 0);
+        await h.app.library.structure.relocateChapter(
+          book,
+          chapter.id,
+          target.id,
+          0,
+        );
       }),
     );
     writer.holdIndex = false;
@@ -162,7 +167,7 @@ void main() {
     expect(
       await h.app.editor.runStructure(
         book,
-        () => h.app.library.deleteChapter(book, volume, chapter),
+        () => h.app.library.structure.deleteChapter(book, volume, chapter),
       ),
       isFalse,
     );
@@ -175,7 +180,7 @@ void main() {
     expect(
       await h.app.editor.runStructure(
         book,
-        () => h.app.library.deleteChapter(book, volume, chapter),
+        () => h.app.library.structure.deleteChapter(book, volume, chapter),
       ),
       isTrue,
     );
@@ -221,11 +226,16 @@ void main() {
   test('不允许跨书ID或无效拖放索引，不改变任何顺序', () async {
     final (h, _, book, volume, chapter) = await setup();
     await expectLater(
-      h.app.library.relocateChapter(book, chapter.id, 'other-book-volume', 0),
+      h.app.library.structure.relocateChapter(
+        book,
+        chapter.id,
+        'other-book-volume',
+        0,
+      ),
       throwsStateError,
     );
     await expectLater(
-      h.app.library.relocateChapter(book, chapter.id, volume.id, -1),
+      h.app.library.structure.relocateChapter(book, chapter.id, volume.id, -1),
       throwsRangeError,
     );
     expect(volume.chapters.single.id, chapter.id);

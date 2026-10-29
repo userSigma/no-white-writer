@@ -92,9 +92,12 @@ void main() {
       '一千零一个字',
     );
 
-    final Volume second = await h.library.appendVolume(book);
+    final Volume second = await h.library.structure.appendVolume(book);
     expect(second.order, 1);
-    final ChapterMeta chapter = await h.library.appendChapter(book, second);
+    final ChapterMeta chapter = await h.library.structure.appendChapter(
+      book,
+      second,
+    );
     expect(chapter.order, 0);
 
     final BookIndex reloaded = await h.books.load(summary);
@@ -102,7 +105,7 @@ void main() {
     expect(reloaded.volumes[1].chapters.single.title, '未命名章节');
   });
 
-  test('重命名与排序：renameChapter / moveChapter 会立刻落盘', () async {
+  test('重命名与排序会立刻落盘', () async {
     final _Harness h = await _build();
     addTearDown(h.dispose);
 
@@ -110,10 +113,10 @@ void main() {
     final BookIndex book = await h.library.openBook(summary);
     final Volume volume = book.volumes.single;
     final ChapterMeta a = volume.chapters.single;
-    final ChapterMeta b = await h.library.appendChapter(book, volume);
+    final ChapterMeta b = await h.library.structure.appendChapter(book, volume);
 
-    await h.library.renameChapter(book, b, '第二章 新名字');
-    await h.library.moveChapter(book, volume, b, -1);
+    await h.library.structure.renameChapter(book, b, '第二章 新名字');
+    await h.library.structure.relocateChapter(book, b.id, volume.id, 0);
 
     final BookIndex reloaded = await h.books.load(summary);
     final Volume rv = reloaded.volumes.single;
@@ -133,7 +136,7 @@ void main() {
     final File txt = h.chapters.fileOf(book.id, volume.id, chapter.id);
     await h.chapters.writeText(book.id, volume.id, chapter.id, '要删除的正文');
 
-    await h.library.deleteChapter(book, volume, chapter);
+    await h.library.structure.deleteChapter(book, volume, chapter);
     expect(txt.existsSync(), isFalse);
     final Directory trash = Directory('${h.root.path}/trash');
     expect(trash.listSync(recursive: true).whereType<File>(), isNotEmpty);

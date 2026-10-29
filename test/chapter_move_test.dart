@@ -138,6 +138,45 @@ void main() {
     });
   }
 
+  for (final phase in ['record', 'index']) {
+    test('$phase 后残留的半成品tmp可按持久化归属恢复', () async {
+      final store = ChapterMoveStore(
+        paths,
+        const AtomicFileWriter(),
+        onPhase: (name) async {
+          if (name == phase) throw StateError('inject:$phase');
+        },
+      );
+      await expectLater(
+        store.move(
+          bookId: 'b',
+          sourceId: 'source',
+          targetId: 'target',
+          chapterId: 'c',
+          commitIndex: commit,
+        ),
+        throwsStateError,
+      );
+      final target = paths.chapterFile('b', 'target', 'c');
+      final partial = File('${target.path}.tmp');
+      await partial.parent.create(recursive: true);
+      await partial.writeAsString('partial');
+
+      final fresh = ChapterMoveStore(paths, const AtomicFileWriter());
+      await fresh.recover('b');
+
+      final raw = jsonDecode(await paths.bookFile('b').readAsString());
+      final persisted = BookIndex.fromJson(raw as Map<String, dynamic>);
+      final expectedOwner = phase == 'index' ? 'target' : 'source';
+      final owner = persisted.volumeOfChapter('c')!;
+      expect(owner.id, expectedOwner);
+      expect(await paths.chapterFile('b', owner.id, 'c').readAsBytes(), txt);
+      expect(await partial.exists(), isFalse);
+      expect(await fresh.recordFile('b').exists(), isFalse);
+      await fresh.recover('b');
+    });
+  }
+
   test('不覆盖预存目标，缺源或未解决tmp时停止且不提交', () async {
     final store = ChapterMoveStore(paths, const AtomicFileWriter());
     final target = paths.chapterFile('b', 'target', 'c');

@@ -71,10 +71,51 @@ class WorkspaceController extends ChangeNotifier {
     return true;
   }
 
+  // Catalog commands keep mutation and editor-navigation policy out of widgets.
+  Future<bool> appendVolume(String title) =>
+      change(() => library.structure.appendVolume(book, title: title));
+
+  Future<bool> appendChapter(Volume volume) {
+    ChapterMeta? added;
+    return change(() async {
+      added = await library.structure.appendChapter(book, volume);
+    }, selectAfter: () => added?.id);
+  }
+
+  Future<bool> renameVolume(Volume volume, String title) =>
+      change(() => library.structure.renameVolume(book, volume, title));
+
+  Future<bool> renameChapter(ChapterMeta target, String title) =>
+      change(() async {
+        if (chapter?.id == target.id) {
+          editor.title.text = title;
+          if (!await editor.flush()) {
+            throw StateError(editor.errorMessage ?? '章节标题尚未保存');
+          }
+        } else {
+          await library.structure.renameChapter(book, target, title);
+        }
+      });
+
+  Future<bool> deleteVolume(Volume volume) =>
+      change(() => library.structure.deleteVolume(book, volume));
+
+  Future<bool> deleteChapter(Volume volume, ChapterMeta chapter) =>
+      change(() => library.structure.deleteChapter(book, volume, chapter));
+
+  Future<bool> setVolumeNumberingMode(
+    Volume volume,
+    VolumeNumberingMode mode,
+  ) => change(
+    () => library.structure.setVolumeNumberingMode(book, volume, mode),
+  );
+
+  Future<void> setVolumeExpanded(String volumeId, bool expanded) =>
+      library.setVolumeExpanded(book, volumeId, expanded);
+
   /// 操作之前先落盘；删除当前目标必须先解除绑定，杜绝防抖/失焦复活文件。
   Future<bool> change(
     Future<void> Function() mutation, {
-    Set<String> deletingIds = const <String>{},
     String? Function()? selectAfter,
   }) {
     if (dragging || moving) return Future<bool>.value(false);
@@ -144,7 +185,8 @@ class WorkspaceController extends ChangeNotifier {
     dragging = false;
     return _exclusive(
       () => _performChange(
-        () => library.relocateChapter(book, chapterId, targetId, index),
+        () =>
+            library.structure.relocateChapter(book, chapterId, targetId, index),
       ),
     );
   }
@@ -153,7 +195,9 @@ class WorkspaceController extends ChangeNotifier {
     if (moveMode != MoveMode.volumes) return Future<bool>.value(false);
     dragging = false;
     return _exclusive(
-      () => _performChange(() => library.reorderVolume(book, volumeId, index)),
+      () => _performChange(
+        () => library.structure.reorderVolume(book, volumeId, index),
+      ),
     );
   }
 

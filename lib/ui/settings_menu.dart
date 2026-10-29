@@ -1,40 +1,38 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:fluent_ui/fluent_ui.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../app_context.dart';
+import '../core/i18n/i18n.dart';
 import '../core/models.dart';
 import '../core/text/composing.dart';
 import '../state/settings_controller.dart';
-import 'menu_surface.dart';
 import 'theme/tokens.dart';
 
-/// A reusable anchor: the shelf opens downward and the sidebar footer upward.
+/// 设置入口按钮：点击打开「设置浮窗」（ContentDialog）。
+///
+/// 书架页与编辑器侧栏共用同一按钮与浮窗；dev 验收入口通过 [open]
+/// 打开的是同一个浮窗，而不是单独页面。
 class SettingsMenuButton extends StatefulWidget {
   const SettingsMenuButton({
     super.key,
     required this.app,
     this.enabled = true,
-    this.upward = false,
     this.beforeOpen,
   });
   final AppContext app;
   final bool enabled;
-  final bool upward;
   final Future<bool> Function()? beforeOpen;
   @override
   State<SettingsMenuButton> createState() => SettingsMenuButtonState();
 }
 
 class SettingsMenuButtonState extends State<SettingsMenuButton> {
-  final _flyout = FlyoutController();
   bool _opening = false;
 
-  /// Opens the shared settings menu; the dev entry point uses this so the
-  /// acceptance shortcut shows the real menu instead of a separate page.
+  /// Opens the settings dialog; the dev entry point uses this so the
+  /// acceptance shortcut shows the real dialog instead of a separate page.
   Future<void> open() => _open();
 
   Future<void> _open() async {
@@ -52,70 +50,46 @@ class SettingsMenuButtonState extends State<SettingsMenuButton> {
           !mounted) {
         return;
       }
-      final key = GlobalKey<_SettingsMenuState>();
-      final barrier = TapGestureRecognizer()
-        ..onTap = () {
-          unawaited(
-            key.currentState?.requestClose() ?? Future<bool>.value(false),
-          );
-        };
-      try {
-        await _flyout.showFlyout<void>(
-          dismissWithEsc: false,
-          barrierRecognizer: barrier,
-          placementMode: widget.upward
-              ? FlyoutPlacementMode.topRight
-              : FlyoutPlacementMode.bottomRight,
-          builder: (_) => _SettingsMenu(key: key, app: widget.app),
-        );
-      } finally {
-        barrier.dispose();
-      }
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => _SettingsDialog(app: widget.app),
+      );
     } finally {
       _opening = false;
     }
   }
 
   @override
-  void dispose() {
-    _flyout.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FlyoutTarget(
-    controller: _flyout,
-    child: Tooltip(
-      message: '设置',
-      child: IconButton(
-        key: const ValueKey('settings-button'),
-        icon: const Icon(FluentIcons.settings),
-        onPressed:
-            widget.enabled &&
-                !widget.app.exporter.busy &&
-                !widget.app.editor.isComposing
-            ? _open
-            : null,
-      ),
+  Widget build(BuildContext context) => Tooltip(
+    message: t(context, 'settings.title'),
+    child: IconButton(
+      key: const ValueKey('settings-button'),
+      icon: const Icon(FluentIcons.settings),
+      onPressed:
+          widget.enabled &&
+              !widget.app.exporter.busy &&
+              !widget.app.editor.isComposing
+          ? _open
+          : null,
     ),
   );
 }
 
-class _SettingsMenu extends StatefulWidget {
-  const _SettingsMenu({super.key, required this.app});
+class _SettingsDialog extends StatefulWidget {
+  const _SettingsDialog({required this.app});
   final AppContext app;
   @override
-  State<_SettingsMenu> createState() => _SettingsMenuState();
+  State<_SettingsDialog> createState() => _SettingsDialogState();
 }
 
-class _SettingsMenuState extends State<_SettingsMenu> {
+class _SettingsDialogState extends State<_SettingsDialog> {
   late final TextEditingController _path;
   late final Object _guard;
-  BuildContext? _subMenu;
-  bool _editingPath = false;
   bool _working = false;
   bool _closing = false;
   bool _confirming = false;
+  bool _manageOpen = false;
   String? _message;
   bool _messageError = false;
   AppContext get app => widget.app;
@@ -131,30 +105,23 @@ class _SettingsMenuState extends State<_SettingsMenu> {
     )..addListener(_refresh);
     app.settings.addListener(_refresh);
     _guard = app.registerUiGuard(_prepareClose);
-    HardwareKeyboard.instance.addHandler(_key);
   }
 
   void _refresh() {
     if (mounted) setState(() {});
   }
 
-  bool _key(KeyEvent event) {
+  /// Esc 关闭浮窗（确认框打开时交还给确认框自己）。
+  ///
+  /// 走焦点系统而不是全局键盘钩子：ComboBox 弹层打开时它内部先消费
+  /// Esc 只关弹层，未消费的 Esc 才冒泡到这里关闭浮窗。
+  KeyEventResult _key(FocusNode node, KeyEvent event) {
     if (event.logicalKey != LogicalKeyboardKey.escape || _confirming) {
-      return false;
+      return KeyEventResult.ignored;
     }
-    if (event is! KeyDownEvent) return true;
-    final child = _subMenu;
-    if (child != null && child.mounted) {
-      final flyout = Flyout.of(child);
-      final key = flyout.widget.menuKey;
-      if (key != null && MenuInfoProvider.of(child).contains(key)) {
-        flyout.close();
-        _subMenu = null;
-        return true;
-      }
-    }
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
     unawaited(requestClose());
-    return true;
+    return KeyEventResult.handled;
   }
 
   void _notice(String text, {bool error = false}) {
@@ -173,16 +140,16 @@ class _SettingsMenuState extends State<_SettingsMenu> {
       final discard = await showDialog<bool>(
         context: context,
         builder: (context) => ContentDialog(
-          title: const Text('导出目录尚未保存'),
-          content: const Text('丢弃这次目录修改，还是继续编辑？'),
+          title: Text(t(context, 'settings.exportDir.confirm.title')),
+          content: Text(t(context, 'settings.exportDir.confirm.body')),
           actions: [
             Button(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('继续编辑'),
+              child: Text(t(context, 'settings.exportDir.confirm.keep')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('丢弃修改'),
+              child: Text(t(context, 'settings.exportDir.confirm.discard')),
             ),
           ],
         ),
@@ -195,7 +162,11 @@ class _SettingsMenuState extends State<_SettingsMenu> {
       await app.settings.flush();
       return true;
     } catch (error) {
-      _notice('设置保存失败：$error', error: true);
+      if (!mounted) return false;
+      _notice(
+        t(context, 'settings.saveError', {'error': '$error'}),
+        error: true,
+      );
       return false;
     }
   }
@@ -224,11 +195,14 @@ class _SettingsMenuState extends State<_SettingsMenu> {
     app.settings.setExportDirectory(text.isEmpty ? null : text);
     try {
       await app.settings.flush();
-      _notice('导出目录已保存');
+      if (!mounted) return;
+      _notice(t(context, 'settings.exportDir.saved'));
     } catch (error) {
       // Restore only the confirmed preference; keep the failed input for retry.
+      // 失败详情交给浮窗内的红字（settings-save-error）与「重试保存」按钮，
+      // 不再额外弹 InfoBar，避免通知层遮住重试按钮。
       app.settings.settings.exportDirectory = previous;
-      _notice('设置保存失败：$error', error: true);
+      if (!mounted) return;
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -238,14 +212,23 @@ class _SettingsMenuState extends State<_SettingsMenu> {
     if (_working || _composing) return;
     setState(() => _working = true);
     try {
-      if (!await app.platform.revealInFileManager(path)) {
-        throw StateError('系统未能打开目录');
+      final opened = await app.platform.revealInFileManager(path);
+      if (!mounted) return;
+      if (!opened) {
+        _notice(t(context, 'settings.openDir.failed'), error: true);
+      } else {
+        _notice(t(context, 'settings.openDir.opened'));
       }
-      _notice('目录已打开');
     } catch (error) {
-      _notice('打开目录失败：$error', error: true);
+      _notice('$error', error: true);
     } finally {
       if (mounted) setState(() => _working = false);
+    }
+  }
+
+  void _setLanguage(String code) {
+    if (app.i18n.setLanguage(code)) {
+      app.settings.setLanguage(code);
     }
   }
 
@@ -253,7 +236,9 @@ class _SettingsMenuState extends State<_SettingsMenu> {
     if (app.settings.settings.customThemes.length >=
         SettingsController.customThemeLimit) {
       _notice(
-        '自定义主题已达 ${SettingsController.customThemeLimit} 套上限，请先删除一套。',
+        t(context, 'settings.theme.limitReached', {
+          'limit': '${SettingsController.customThemeLimit}',
+        }),
         error: true,
       );
       return;
@@ -271,11 +256,16 @@ class _SettingsMenuState extends State<_SettingsMenu> {
       name: draft.name,
     );
     if (created == null) {
-      _notice('创建失败：自定义主题已达上限。', error: true);
+      _notice(
+        t(context, 'settings.theme.limitReached', {
+          'limit': '${SettingsController.customThemeLimit}',
+        }),
+        error: true,
+      );
       return;
     }
     app.settings.setThemeMode('custom:${created.id}');
-    _notice('已创建并应用「${created.name}」');
+    _notice(t(context, 'settings.theme.created', {'name': created.name}));
   }
 
   Future<void> _renameCustomTheme(CustomTheme theme) async {
@@ -287,7 +277,7 @@ class _SettingsMenuState extends State<_SettingsMenu> {
     _confirming = false;
     if (name == null || !mounted) return;
     if (!app.settings.renameCustomTheme(theme.id, name)) {
-      _notice('重命名失败：名称不能为空。', error: true);
+      _notice(t(context, 'settings.theme.rename.failed'), error: true);
     }
   }
 
@@ -296,16 +286,16 @@ class _SettingsMenuState extends State<_SettingsMenu> {
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (context) => ContentDialog(
-        title: Text('删除「${theme.name}」？'),
-        content: const Text('删除后不可恢复；若正在使用该主题，将回退为跟随系统。'),
+        title: Text(t(context, 'settings.theme.delete', {'name': theme.name})),
+        content: Text(t(context, 'settings.theme.delete.confirm.body')),
         actions: <Widget>[
           Button(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(t(context, 'common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
+            child: Text(t(context, 'common.delete')),
           ),
         ],
       ),
@@ -315,291 +305,429 @@ class _SettingsMenuState extends State<_SettingsMenu> {
     app.settings.deleteCustomTheme(theme.id);
   }
 
-  MenuFlyoutSubItem _sub(
-    String label,
-    List<MenuFlyoutItemBase> Function() items,
-  ) => MenuFlyoutSubItem(
-    text: Text(label),
-    items: (context) {
-      _subMenu = context;
-      return items();
-    },
-  );
+  // ---- 布局辅助 ----------------------------------------------------------
 
-  MenuFlyoutItem _action(
-    String label,
-    VoidCallback? action, {
-    Widget? leading,
-  }) => MenuFlyoutItem(
-    text: Text(label),
-    leading: leading,
-    closeAfterClick: false,
-    onPressed: action,
-  );
-
-  MenuFlyoutItemBuilder _content(Widget child) => MenuFlyoutItemBuilder(
-    builder: (_) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: child,
+  Widget _row(String label, Widget control) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 7),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        SizedBox(
+          width: 96,
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 13, color: bodyTextColor(context)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: control),
+      ],
     ),
   );
 
-  List<MenuFlyoutItemBase> _items(double width) {
-    final settings = app.settings.settings;
-    final result = <MenuFlyoutItemBase>[
-      _content(
-        Text(
-          _editingPath ? '导出目录' : '设置',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: accentColor(context),
-          ),
-        ),
-      ),
-    ];
-    if (_editingPath) {
-      result.addAll([
-        _content(
-          SizedBox(
-            width: width - 32,
-            child: TextBox(
-              key: const ValueKey('settings-export-path'),
-              controller: _path,
-              enabled: !_working,
-              placeholder: '留空使用默认文档目录',
-              onEditingComplete: () {},
-              onSubmitted: (_) {
-                if (!_composing) unawaited(_savePath());
-              },
-            ),
-          ),
-        ),
-        _content(
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              Button(
-                onPressed: _working || _composing ? null : _savePath,
-                child: const Text('保存'),
-              ),
-              Button(
-                onPressed: _working || _composing
-                    ? null
-                    : () => _savePath(useDefault: true),
-                child: const Text('恢复默认'),
-              ),
-            ],
-          ),
-        ),
-        _action(
-          '打开导出目录',
-          _working || _composing
-              ? null
-              : () {
-                  if (_dirty) {
-                    _notice('请先保存目录修改', error: true);
-                    return;
-                  }
-                  unawaited(
-                    _openDirectory(
-                      app.paths.exportRoot(settings.exportDirectory),
-                    ),
-                  );
-                },
-        ),
-        _action(
-          '返回设置',
-          _working || _composing
-              ? null
-              : () async {
-                  if (await _prepareClose() && mounted) {
-                    setState(() => _editingPath = false);
-                  }
-                },
-        ),
-      ]);
-    } else {
-      result.addAll([
-        _sub('主题', () {
-          final bool full =
-              settings.customThemes.length >=
-              SettingsController.customThemeLimit;
-          return <MenuFlyoutItemBase>[
-            for (final item in const [
-              ('system', '跟随系统'),
-              ('light', '浅色（纯白）'),
-              ('dark', '深色（纯黑）'),
-            ])
-              RadioMenuFlyoutItem<String>(
-                text: Text(item.$2),
-                value: item.$1,
-                groupValue: settings.themeMode,
-                closeAfterClick: false,
-                onChanged: app.settings.setThemeMode,
-              ),
-            const MenuFlyoutSeparator(),
-            for (final CustomTheme theme in settings.customThemes)
-              RadioMenuFlyoutItem<String>(
-                text: Text(theme.name),
-                value: 'custom:${theme.id}',
-                groupValue: settings.themeMode,
-                closeAfterClick: false,
-                onChanged: app.settings.setThemeMode,
-              ),
-            MenuFlyoutItem(
-              text: Text(
-                full
-                    ? '新建自定义主题（已达 ${SettingsController.customThemeLimit} 套上限）'
-                    : '新建自定义主题…',
-              ),
-              closeAfterClick: false,
-              onPressed: full ? null : () => unawaited(_createCustomTheme()),
-            ),
-            if (settings.customThemes.isNotEmpty)
-              _sub(
-                '管理自定义主题',
-                () => <MenuFlyoutItemBase>[
-                  for (final CustomTheme theme
-                      in settings.customThemes) ...<MenuFlyoutItemBase>[
-                    _action(
-                      '重命名「${theme.name}」…',
-                      () => unawaited(_renameCustomTheme(theme)),
-                    ),
-                    _action(
-                      '删除「${theme.name}」',
-                      () => unawaited(_deleteCustomTheme(theme)),
-                    ),
-                  ],
-                ],
-              ),
-          ];
-        }),
-        _sub(
-          '字号',
-          () => [
-            for (var value = 14; value <= 28; value++)
-              RadioMenuFlyoutItem<double>(
-                text: Text('$value'),
-                value: value.toDouble(),
-                groupValue: settings.fontSize,
-                closeAfterClick: false,
-                onChanged: app.settings.setFontSize,
-              ),
-          ],
-        ),
-        _sub(
-          '行距',
-          () => [
-            for (var step = 0; step <= 10; step++)
-              RadioMenuFlyoutItem<double>(
-                text: Text((1.4 + step / 10).toStringAsFixed(1)),
-                value: (14 + step) / 10,
-                groupValue: settings.lineHeight,
-                closeAfterClick: false,
-                onChanged: app.settings.setLineHeight,
-              ),
-          ],
-        ),
-        ToggleMenuFlyoutItem(
-          text: const Text('自动首行缩进'),
-          value: settings.autoIndent,
-          closeAfterClick: false,
-          onChanged: app.settings.setAutoIndent,
-        ),
-        ToggleMenuFlyoutItem(
-          text: const Text('段间空行'),
-          value: settings.blankLineBetween,
-          closeAfterClick: false,
-          onChanged: app.settings.setBlankLineBetween,
-        ),
-        _action('导出目录…', () => setState(() => _editingPath = true)),
-        _action(
-          '打开数据目录',
-          _working ? null : () => _openDirectory(app.paths.dataRootPath),
-        ),
-        _action(
-          '打开日志目录',
-          _working ? null : () => _openDirectory(app.paths.logsDir),
-        ),
-        _sub(
-          '关于',
-          () => [
-            _content(const Text('不白写作 0.4.0')),
-            _content(const Text('本地纯文本写作，作品与设置保存在本机。')),
-          ],
-        ),
-      ]);
-    }
-    final error = app.settings.saveError;
-    if (error != null) {
-      result.add(
-        _content(
-          Text('设置保存失败：$error', key: const ValueKey('settings-save-error')),
-        ),
-      );
-      result.add(
-        _action(
-          '重试保存',
-          _working || _composing
-              ? null
-              : () async {
-                  if (_editingPath && _dirty) {
-                    await _savePath();
-                    return;
-                  }
-                  try {
-                    await app.settings.flush();
-                    _notice('设置已保存');
-                  } catch (error) {
-                    _notice('设置保存失败：$error', error: true);
-                  }
-                },
-        ),
-      );
-    }
-    if (_message != null) {
-      result.add(
-        _content(
-          InfoBar(
-            key: const ValueKey('settings-notice'),
-            title: Text(_message!),
-            severity: _messageError
-                ? InfoBarSeverity.error
-                : InfoBarSeverity.success,
-          ),
-        ),
-      );
-    }
-    return result;
-  }
+  Widget _divider() => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Container(height: 1, color: hairlineColor(context)),
+  );
+
+  ComboBox<double> _combo({
+    required double? value,
+    required List<double> values,
+    required String Function(double) label,
+    required ValueChanged<double?> onChanged,
+    Key? comboKey,
+  }) => ComboBox<double>(
+    key: comboKey,
+    value: value,
+    items: <ComboBoxItem<double>>[
+      for (final double v in values)
+        ComboBoxItem<double>(value: v, child: Text(label(v))),
+    ],
+    onChanged: _working || _composing ? null : onChanged,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final width = math.max(80.0, math.min(340.0, size.width - 32));
+    final settings = app.settings.settings;
+    final packs = app.i18n.packs;
+    final themeEntries = <(String, String)>[
+      ('system', t(context, 'settings.theme.system')),
+      ('light', t(context, 'settings.theme.light')),
+      ('dark', t(context, 'settings.theme.dark')),
+      for (final CustomTheme theme in settings.customThemes)
+        ('custom:${theme.id}', theme.name),
+    ];
+    final fontSizes = <double>[for (var v = 14; v <= 28; v++) v.toDouble()];
+    final lineHeights = <double>[for (var s = 0; s <= 10; s++) (14 + s) / 10];
+    final error = app.settings.saveError;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(requestClose());
       },
-      child: DisableAcrylic(
-        // 不给 MenuFlyout 传显式 color：fluent_ui 的
-        // MenuFlyoutSubItem.show() 会把父级的 color 值捕获进闭包且不再
-        // 刷新，显式色会让子菜单在主题切换后冻结成反色空壳（文字也因
-        // 实时主题反色而不可见）。留空后根/子菜单表面都从 FluentTheme
-        // 实时读 menuColor（= 主题背景，见 buildFluentTheme），随主题
-        // 即时换色；DisableAcrylic 关掉 0.65 透明度的亚克力混合，表面
-        // 实心等价于原 paperOrInk 视觉。
-        child: MenuFlyout(
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: _key,
+        child: ContentDialog(
           key: const ValueKey('settings-menu'),
-          shape: borderlessMenuShape,
-          constraints: BoxConstraints(
-            minWidth: width,
-            maxWidth: width,
-            maxHeight: math.max(80, size.height - 32),
+          title: Text(
+            t(context, 'settings.title'),
+            style: const TextStyle(
+              color: AppColors.cinnabar,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          items: _items(width),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _row(
+                    t(context, 'settings.language'),
+                    ComboBox<String>(
+                      key: const ValueKey('settings-language'),
+                      value: packs.any((p) => p.code == app.i18n.currentCode)
+                          ? app.i18n.currentCode
+                          : null,
+                      items: <ComboBoxItem<String>>[
+                        for (final pack in packs)
+                          ComboBoxItem<String>(
+                            value: pack.code,
+                            child: Text('${pack.name} (${pack.code})'),
+                          ),
+                      ],
+                      onChanged: _working
+                          ? null
+                          : (code) {
+                              if (code != null) _setLanguage(code);
+                            },
+                    ),
+                  ),
+                  _row(
+                    t(context, 'settings.theme'),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        ComboBox<String>(
+                          key: const ValueKey('settings-theme'),
+                          value:
+                              themeEntries.any(
+                                (e) => e.$1 == settings.themeMode,
+                              )
+                              ? settings.themeMode
+                              : null,
+                          items: <ComboBoxItem<String>>[
+                            for (final entry in themeEntries)
+                              ComboBoxItem<String>(
+                                value: entry.$1,
+                                child: Text(entry.$2),
+                              ),
+                          ],
+                          onChanged: _working || _composing
+                              ? null
+                              : (mode) {
+                                  if (mode != null) {
+                                    app.settings.setThemeMode(mode);
+                                  }
+                                },
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            Button(
+                              onPressed:
+                                  _working ||
+                                      _composing ||
+                                      settings.customThemes.length >=
+                                          SettingsController.customThemeLimit
+                                  ? null
+                                  : () => unawaited(_createCustomTheme()),
+                              child: Text(
+                                t(context, 'settings.theme.newCustom'),
+                              ),
+                            ),
+                            if (settings.customThemes.isNotEmpty)
+                              Button(
+                                onPressed: _working || _composing
+                                    ? null
+                                    : () => setState(
+                                        () => _manageOpen = !_manageOpen,
+                                      ),
+                                child: Text(
+                                  t(context, 'settings.theme.manage'),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (_manageOpen) ...<Widget>[
+                          const SizedBox(height: 8),
+                          for (final CustomTheme theme in settings.customThemes)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Row(
+                                children: <Widget>[
+                                  Expanded(child: Text(theme.name)),
+                                  Button(
+                                    key: ValueKey(
+                                      'custom-theme-rename-${theme.id}',
+                                    ),
+                                    onPressed: _working || _composing
+                                        ? null
+                                        : () => unawaited(
+                                            _renameCustomTheme(theme),
+                                          ),
+                                    child: Text(t(context, 'common.rename')),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Button(
+                                    key: ValueKey(
+                                      'custom-theme-delete-${theme.id}',
+                                    ),
+                                    onPressed: _working || _composing
+                                        ? null
+                                        : () => unawaited(
+                                            _deleteCustomTheme(theme),
+                                          ),
+                                    child: Text(t(context, 'common.delete')),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  _divider(),
+                  _row(
+                    t(context, 'settings.fontSize'),
+                    _combo(
+                      comboKey: const ValueKey('settings-font-size'),
+                      value: fontSizes.contains(settings.fontSize)
+                          ? settings.fontSize
+                          : null,
+                      values: fontSizes,
+                      label: (v) => v.toInt().toString(),
+                      onChanged: (value) {
+                        if (value != null) app.settings.setFontSize(value);
+                      },
+                    ),
+                  ),
+                  _row(
+                    t(context, 'settings.lineHeight'),
+                    _combo(
+                      comboKey: const ValueKey('settings-line-height'),
+                      value: lineHeights.contains(settings.lineHeight)
+                          ? settings.lineHeight
+                          : null,
+                      values: lineHeights,
+                      label: (v) => v.toStringAsFixed(1),
+                      onChanged: (value) {
+                        if (value != null) app.settings.setLineHeight(value);
+                      },
+                    ),
+                  ),
+                  _row(
+                    t(context, 'settings.autoIndent'),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ToggleSwitch(
+                        key: const ValueKey('settings-auto-indent'),
+                        checked: settings.autoIndent,
+                        onChanged: _working || _composing
+                            ? null
+                            : app.settings.setAutoIndent,
+                      ),
+                    ),
+                  ),
+                  _row(
+                    t(context, 'settings.blankLine'),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ToggleSwitch(
+                        key: const ValueKey('settings-blank-line'),
+                        checked: settings.blankLineBetween,
+                        onChanged: _working || _composing
+                            ? null
+                            : app.settings.setBlankLineBetween,
+                      ),
+                    ),
+                  ),
+                  _divider(),
+                  _row(
+                    t(context, 'settings.exportDir'),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        TextBox(
+                          key: const ValueKey('settings-export-path'),
+                          controller: _path,
+                          enabled: !_working,
+                          placeholder: t(context, 'settings.exportDir.hint'),
+                          onEditingComplete: () {},
+                          onSubmitted: (_) {
+                            if (!_composing) unawaited(_savePath());
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            Button(
+                              onPressed: _working || _composing
+                                  ? null
+                                  : () => unawaited(_savePath()),
+                              child: Text(t(context, 'common.save')),
+                            ),
+                            Button(
+                              onPressed: _working || _composing
+                                  ? null
+                                  : () =>
+                                        unawaited(_savePath(useDefault: true)),
+                              child: Text(
+                                t(context, 'settings.exportDir.reset'),
+                              ),
+                            ),
+                            Button(
+                              onPressed: _working || _composing
+                                  ? null
+                                  : () {
+                                      if (_dirty) {
+                                        _notice(
+                                          t(
+                                            context,
+                                            'settings.exportDir.pending',
+                                          ),
+                                          error: true,
+                                        );
+                                        return;
+                                      }
+                                      unawaited(
+                                        _openDirectory(
+                                          app.paths.exportRoot(
+                                            settings.exportDirectory,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                              child: Text(
+                                t(context, 'settings.exportDir.open'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  _row(
+                    '',
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        Button(
+                          onPressed: _working
+                              ? null
+                              : () => unawaited(
+                                  _openDirectory(app.paths.dataRootPath),
+                                ),
+                          child: Text(t(context, 'settings.dataDir')),
+                        ),
+                        Button(
+                          onPressed: _working
+                              ? null
+                              : () => unawaited(
+                                  _openDirectory(app.paths.logsDir),
+                                ),
+                          child: Text(t(context, 'settings.logsDir')),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          t(context, 'settings.about.version'),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          t(context, 'settings.about.desc'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: mutedTextColor(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (error != null) ...<Widget>[
+                    const SizedBox(height: 8),
+                    Text(
+                      t(context, 'settings.saveError', {'error': error}),
+                      key: const ValueKey('settings-save-error'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: FluentTheme.of(context).accentColor.darkest,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Button(
+                      onPressed: _working || _composing
+                          ? null
+                          : () async {
+                              if (_dirty) {
+                                await _savePath();
+                                return;
+                              }
+                              try {
+                                await app.settings.flush();
+                                if (!context.mounted) return;
+                                _notice(t(context, 'settings.saved'));
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                _notice(
+                                  t(context, 'settings.saveError', {
+                                    'error': '$error',
+                                  }),
+                                  error: true,
+                                );
+                              }
+                            },
+                      child: Text(t(context, 'settings.retrySave')),
+                    ),
+                  ],
+                  if (_message != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: InfoBar(
+                        key: const ValueKey('settings-notice'),
+                        title: Text(_message!),
+                        severity: _messageError
+                            ? InfoBarSeverity.error
+                            : InfoBarSeverity.success,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: _working || _composing || _confirming
+                  ? null
+                  : () => unawaited(requestClose()),
+              child: Text(t(context, 'common.close')),
+            ),
+          ],
         ),
       ),
     );
@@ -607,7 +735,6 @@ class _SettingsMenuState extends State<_SettingsMenu> {
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_key);
     app.removeUiGuard(_guard);
     app.settings.removeListener(_refresh);
     _path.removeListener(_refresh);
@@ -704,7 +831,7 @@ class _CustomThemeDialogState extends State<_CustomThemeDialog> {
   @override
   Widget build(BuildContext context) {
     return ContentDialog(
-      title: const Text('新建自定义主题'),
+      title: Text(t(context, 'settings.theme.create.title')),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
@@ -712,17 +839,20 @@ class _CustomThemeDialogState extends State<_CustomThemeDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              TextBox(controller: _name, placeholder: '主题名称（留空自动编号，如「自定义主题1」）'),
+              TextBox(
+                controller: _name,
+                placeholder: t(context, 'settings.theme.name.hint'),
+              ),
               const SizedBox(height: 14),
               _ColorField(
-                label: '背景颜色',
+                label: t(context, 'settings.theme.background'),
                 selected: _background,
                 palette: _backgroundPresets,
                 onSelected: _selectBackground,
               ),
               const SizedBox(height: 14),
               _ColorField(
-                label: '提示颜色（强调色）',
+                label: t(context, 'settings.theme.accent'),
                 selected: _accent,
                 palette: _accentPresets,
                 onSelected: _selectAccent,
@@ -734,7 +864,10 @@ class _CustomThemeDialogState extends State<_CustomThemeDialog> {
         ),
       ),
       actions: <Widget>[
-        Button(onPressed: Navigator.of(context).pop, child: const Text('取消')),
+        Button(
+          onPressed: Navigator.of(context).pop,
+          child: Text(t(context, 'common.cancel')),
+        ),
         FilledButton(
           onPressed: () {
             Navigator.of(context).pop(
@@ -745,7 +878,7 @@ class _CustomThemeDialogState extends State<_CustomThemeDialog> {
               ),
             );
           },
-          child: const Text('创建并应用'),
+          child: Text(t(context, 'settings.theme.create.confirm')),
         ),
       ],
     );
@@ -768,7 +901,6 @@ class _ColorField extends StatefulWidget {
   final Color selected;
   final List<Color> palette;
   final ValueChanged<Color> onSelected;
-
   @override
   State<_ColorField> createState() => _ColorFieldState();
 }
@@ -859,7 +991,7 @@ class _ColorFieldState extends State<_ColorField> {
           width: 140,
           child: TextBox(
             controller: _hex,
-            placeholder: '如 0xFFA6402B 或 F5F0E6',
+            placeholder: t(context, 'settings.theme.hex.hint'),
             onChanged: (_) => setState(() {}),
           ),
         ),
@@ -867,7 +999,7 @@ class _ColorFieldState extends State<_ColorField> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              'HEX 无效：应为 6 位十六进制（可带 #）',
+              t(context, 'settings.theme.hex.invalid'),
               style: TextStyle(
                 fontSize: 11,
                 color: FluentTheme.of(context).accentColor.darkest,
@@ -911,11 +1043,11 @@ class _ThemePreview extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  '正文预览 Aa',
+                  t(context, 'settings.theme.preview.body'),
                   style: TextStyle(color: preview.bodyText, fontSize: 13),
                 ),
                 Text(
-                  '弱化文字预览',
+                  t(context, 'settings.theme.preview.muted'),
                   style: TextStyle(color: preview.mutedText, fontSize: 11),
                 ),
               ],
@@ -964,15 +1096,18 @@ class _RenameThemeDialogState extends State<_RenameThemeDialog> {
   @override
   Widget build(BuildContext context) {
     return ContentDialog(
-      title: const Text('重命名自定义主题'),
+      title: Text(t(context, 'settings.theme.rename.title')),
       content: TextBox(controller: _controller, autofocus: true),
       actions: <Widget>[
-        Button(onPressed: Navigator.of(context).pop, child: const Text('取消')),
+        Button(
+          onPressed: Navigator.of(context).pop,
+          child: Text(t(context, 'common.cancel')),
+        ),
         FilledButton(
           onPressed: _controller.text.trim().isEmpty
               ? null
               : () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('确定'),
+          child: Text(t(context, 'common.confirm')),
         ),
       ],
     );

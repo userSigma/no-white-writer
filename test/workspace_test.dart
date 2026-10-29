@@ -38,7 +38,7 @@ void main() {
     addTearDown(h.dispose);
     final BookSummary summary = await h.app.library.createBook('上次章节');
     final BookIndex book = await h.app.library.openBook(summary);
-    final ChapterMeta second = await h.app.library.appendChapter(
+    final ChapterMeta second = await h.app.library.structure.appendChapter(
       book,
       book.volumes.first,
     );
@@ -67,7 +67,7 @@ void main() {
     final WorkspaceController w = await workspace(h, book);
     expect(w.chapter?.id, book.allChapters.first.id);
     expect(await w.close(), isTrue);
-    await h.app.library.deleteVolume(book, book.volumes.first);
+    await h.app.library.structure.deleteVolume(book, book.volumes.first);
     expect(await w.initialize(), isTrue);
     expect(w.chapter, isNull);
     expect(h.app.editor.hasChapter, isFalse);
@@ -80,16 +80,21 @@ void main() {
     final BookIndex book = await h.app.library.openBook(summary);
     final Volume volume = book.volumes.first;
     final ChapterMeta first = volume.chapters.first;
-    final ChapterMeta second = await h.app.library.appendChapter(book, volume);
-    final ChapterMeta third = await h.app.library.appendChapter(book, volume);
+    final ChapterMeta second = await h.app.library.structure.appendChapter(
+      book,
+      volume,
+    );
+    final ChapterMeta third = await h.app.library.structure.appendChapter(
+      book,
+      volume,
+    );
     final WorkspaceController w = await workspace(h, book);
     await w.select(volume, second);
     h.app.editor.title.text = '删除前标题';
     h.app.editor.text.text = '删除前正文';
     expect(
       await w.change(
-        () => h.app.library.deleteChapter(book, volume, second),
-        deletingIds: <String>{second.id},
+        () => h.app.library.structure.deleteChapter(book, volume, second),
       ),
       isTrue,
     );
@@ -100,16 +105,14 @@ void main() {
     );
     expect(
       await w.change(
-        () => h.app.library.deleteChapter(book, volume, third),
-        deletingIds: <String>{third.id},
+        () => h.app.library.structure.deleteChapter(book, volume, third),
       ),
       isTrue,
     );
     expect(w.chapter?.id, first.id);
     expect(
       await w.change(
-        () => h.app.library.deleteChapter(book, volume, first),
-        deletingIds: <String>{first.id},
+        () => h.app.library.structure.deleteChapter(book, volume, first),
       ),
       isTrue,
     );
@@ -128,22 +131,24 @@ void main() {
     final BookSummary summary = await h.app.library.createBook('卷删除');
     final BookIndex book = await h.app.library.openBook(summary);
     final Volume first = book.volumes.first;
-    final Volume second = await h.app.library.appendVolume(book);
-    final ChapterMeta chapter = await h.app.library.appendChapter(book, second);
-    final ChapterMeta extra = await h.app.library.appendChapter(book, second);
+    final Volume second = await h.app.library.structure.appendVolume(book);
+    final ChapterMeta chapter = await h.app.library.structure.appendChapter(
+      book,
+      second,
+    );
+    final ChapterMeta extra = await h.app.library.structure.appendChapter(
+      book,
+      second,
+    );
     final WorkspaceController w = await workspace(h, book);
     expect(
-      await w.change(
-        () => h.app.library.deleteVolume(book, first),
-        deletingIds: first.chapters.map((ChapterMeta c) => c.id).toSet(),
-      ),
+      await w.change(() => h.app.library.structure.deleteVolume(book, first)),
       isTrue,
     );
     expect(w.chapter?.id, chapter.id);
     expect(
       await w.change(
-        () => h.app.library.deleteChapter(book, second, extra),
-        deletingIds: <String>{extra.id},
+        () => h.app.library.structure.deleteChapter(book, second, extra),
       ),
       isTrue,
     );
@@ -156,7 +161,7 @@ void main() {
     addTearDown(h.dispose);
     final BookSummary summary = await h.app.library.createBook('失败保护');
     final BookIndex book = await h.app.library.openBook(summary);
-    final ChapterMeta next = await h.app.library.appendChapter(
+    final ChapterMeta next = await h.app.library.structure.appendChapter(
       book,
       book.volumes.first,
     );
@@ -200,7 +205,10 @@ void main() {
     ChapterMeta? added;
     expect(
       await w.change(() async {
-        added = await h.app.library.appendChapter(book, book.volumes.first);
+        added = await h.app.library.structure.appendChapter(
+          book,
+          book.volumes.first,
+        );
       }, selectAfter: () => added?.id),
       isTrue,
     );

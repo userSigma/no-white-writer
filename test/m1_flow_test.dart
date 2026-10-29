@@ -4,6 +4,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' show TextField;
 import 'package:no_white_writer/app_context.dart';
+import 'package:no_white_writer/core/i18n/i18n.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/storage/app_paths.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
@@ -58,6 +59,7 @@ Future<_Harness> _buildHarness() async {
     library: library,
     settings: settings,
   );
+  final I18nController i18n = I18nController();
   await library.load();
 
   final AppContext app = AppContext(
@@ -71,6 +73,7 @@ Future<_Harness> _buildHarness() async {
     settings: settings,
     library: library,
     editor: editor,
+    i18n: i18n,
     instanceLock: InstanceLock('${dir.path}/instance.lock'),
   );
   return _Harness(app, dir);

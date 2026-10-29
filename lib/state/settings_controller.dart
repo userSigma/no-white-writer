@@ -24,6 +24,14 @@ class SettingsController extends ChangeNotifier {
 
   String get themeMode => settings.themeMode;
 
+  /// 界面语言选择（i18n 语言包 code）；只负责持久化，
+  /// code 是否已注册由 I18nController 在应用时裁决。
+  void setLanguage(String code) {
+    if (settings.language == code) return;
+    settings.language = code;
+    _changed();
+  }
+
   void setThemeMode(String mode) {
     if (settings.themeMode == mode) return;
     settings.themeMode = mode;

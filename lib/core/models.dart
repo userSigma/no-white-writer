@@ -3,6 +3,33 @@ library;
 
 import 'chapter_numbering.dart';
 
+/// 卷级章节编号模式（两层编号的卷层）。
+///
+/// - [followGlobal] 跟随全局编号：全局配置开启时按全局规则编号，关闭则不编号；
+/// - [independent] 卷内独立编号：使用本卷自己的规则（[Volume.numbering]）；
+/// - [none] 不编号。
+enum VolumeNumberingMode {
+  followGlobal('follow-global'),
+  independent('independent'),
+  none('none');
+
+  const VolumeNumberingMode(this.code);
+
+  /// JSON 持久化用编码；未知编码回退 [followGlobal]。
+  final String code;
+
+  /// 解析持久化编码；未知或非字符串返回 `null`（交给迁移逻辑推导）。
+  static VolumeNumberingMode? tryFromCode(Object? code) => switch (code) {
+    'independent' => VolumeNumberingMode.independent,
+    'none' => VolumeNumberingMode.none,
+    'follow-global' => VolumeNumberingMode.followGlobal,
+    _ => null,
+  };
+
+  static VolumeNumberingMode fromCode(String? code) =>
+      tryFromCode(code) ?? VolumeNumberingMode.followGlobal;
+}
+
 class LibraryIndex {
   LibraryIndex({this.schemaVersion = 1, List<BookSummary>? books})
     : books = books ?? <BookSummary>[];
@@ -81,6 +108,7 @@ class BookIndex {
     required this.id,
     required this.title,
     this.notes = '',
+    this.globalNumbering = const ChapterNumbering(),
     List<Volume>? volumes,
   }) : volumes = volumes ?? <Volume>[];
 
@@ -88,6 +116,12 @@ class BookIndex {
   final String id;
   String title;
   String notes;
+
+  /// 书籍级「全局自动章节序号」配置（默认关闭）。
+  ///
+  /// 仅对编号模式为 [VolumeNumberingMode.followGlobal] 的卷生效；
+  /// 关闭时这些卷不编号。规则字段与卷级规则一致（[ChapterNumbering]）。
+  ChapterNumbering globalNumbering;
   final List<Volume> volumes;
 
   Iterable<ChapterMeta> get allChapters =>
@@ -117,6 +151,7 @@ class BookIndex {
     'id': id,
     'title': title,
     'notes': notes,
+    'globalNumbering': globalNumbering.toJson(),
     'volumes': volumes.map((Volume v) => v.toJson()).toList(),
   };
 
@@ -127,6 +162,10 @@ class BookIndex {
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '未命名作品',
       notes: json['notes'] as String? ?? '',
+      // 旧数据没有全局编号：默认关闭，迁移后视觉行为不变。
+      globalNumbering: ChapterNumbering.fromJson(
+        json['globalNumbering'] as Map<String, dynamic>? ?? const {},
+      ),
       volumes: raw
           .whereType<Map<String, dynamic>>()
           .map(Volume.fromJson)
@@ -141,6 +180,7 @@ class Volume {
     required this.title,
     required this.order,
     this.numbering = const ChapterNumbering(),
+    this.numberingMode = VolumeNumberingMode.followGlobal,
     List<ChapterMeta>? chapters,
   }) : chapters = chapters ?? <ChapterMeta>[];
 
@@ -148,7 +188,13 @@ class Volume {
   String title;
   int order;
   final List<ChapterMeta> chapters;
+
+  /// 卷级编号规则：仅在 [VolumeNumberingMode.independent] 模式下生效。
+  /// 字段沿用旧的每卷独立编号设置（保留用户已配置的规则）。
   ChapterNumbering numbering;
+
+  /// 卷级编号模式（两层编号的卷层），新卷默认跟随全局编号。
+  VolumeNumberingMode numberingMode;
 
   int get wordCount =>
       chapters.fold(0, (int s, ChapterMeta c) => s + c.wordCount);
@@ -159,17 +205,27 @@ class Volume {
     'order': order,
     'chapters': chapters.map((ChapterMeta c) => c.toJson()).toList(),
     'numbering': numbering.toJson(),
+    'numberingMode': numberingMode.code,
   };
 
   static Volume fromJson(Map<String, dynamic> json) {
     final List<dynamic> raw = json['chapters'] as List<dynamic>? ?? <dynamic>[];
+    final ChapterNumbering numbering = ChapterNumbering.fromJson(
+      json['numbering'] as Map<String, dynamic>? ?? const {},
+    );
+    // 旧数据迁移：没有 numberingMode（或值无法识别）时按旧开关推导——
+    // 已启用独立编号的卷 → 卷内独立编号（保留其规则）；否则跟随全局编号。
+    final VolumeNumberingMode mode =
+        VolumeNumberingMode.tryFromCode(json['numberingMode']) ??
+        (numbering.enabled
+            ? VolumeNumberingMode.independent
+            : VolumeNumberingMode.followGlobal);
     return Volume(
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '未命名卷',
       order: (json['order'] as num?)?.toInt() ?? 0,
-      numbering: ChapterNumbering.fromJson(
-        json['numbering'] as Map<String, dynamic>? ?? const {},
-      ),
+      numbering: numbering,
+      numberingMode: mode,
       chapters: raw
           .whereType<Map<String, dynamic>>()
           .map(ChapterMeta.fromJson)
@@ -265,6 +321,7 @@ class CustomTheme {
 class AppSettings {
   AppSettings({
     this.themeMode = 'system',
+    this.language = 'zh-CN',
     this.fontSize = 18,
     this.lineHeight = 1.9,
     this.autoIndent = true,
@@ -284,6 +341,10 @@ class AppSettings {
 
   /// system | light | dark | `custom:<CustomTheme.id>`
   String themeMode;
+
+  /// 界面语言（i18n 语言包 code，如 `zh-CN` / `en`）；
+  /// 未注册的 code 由 i18n 层在应用时回退默认语言。
+  String language;
   double fontSize; // 14–28
   double lineHeight; // 1.4–2.4
   bool autoIndent;
@@ -303,6 +364,7 @@ class AppSettings {
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'themeMode': themeMode,
+    'language': language,
     'fontSize': fontSize,
     'lineHeight': lineHeight,
     'autoIndent': autoIndent,
@@ -339,6 +401,7 @@ class AppSettings {
     }
     return AppSettings(
       themeMode: themeMode,
+      language: _parseLanguage(json['language']),
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 18,
       lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.9,
       autoIndent: json['autoIndent'] as bool? ?? true,
@@ -368,4 +431,10 @@ DateTime _parseDate(dynamic value) {
     if (parsed != null) return parsed;
   }
   return DateTime.now();
+}
+
+/// 语言字段容错：非字符串或空白回退默认 `zh-CN`。
+String _parseLanguage(dynamic value) {
+  if (value is String && value.trim().isNotEmpty) return value.trim();
+  return 'zh-CN';
 }

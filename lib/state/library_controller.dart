@@ -1,21 +1,23 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
 import '../core/ids.dart';
-import '../core/chapter_numbering.dart';
 import '../core/models.dart';
 import '../core/storage/app_paths.dart';
 import '../core/storage/book_store.dart';
 import '../core/storage/chapter_store.dart';
 import '../core/storage/library_store.dart';
 import '../core/text/word_count.dart';
+import 'library_operation_gate.dart';
+import 'book_mutation_transaction.dart';
+import 'book_structure_service.dart';
 import 'settings_controller.dart';
 
 enum LibrarySort { recent, title }
 
-/// 书架与目录事务；所有磁盘变更入口计数，导出预约后拒绝后续写入。
+/// 书架与目录事务；所有书库写入经 [LibraryOperationGate] 串行，
+/// 导出预约后拒绝后续写入，并在读取快照前等待既有写入结束。
 class LibraryController extends ChangeNotifier {
   LibraryController({
     required this.paths,
@@ -36,48 +38,52 @@ class LibraryController extends ChangeNotifier {
   bool _loaded = false;
   String? error;
   LibrarySort sort = LibrarySort.recent;
-  bool _exporting = false;
   bool _disposed = false;
-  int _activeWrites = 0;
-  Completer<void>? _writesDone;
-  bool get exporting => _exporting;
+  final LibraryOperationGate _gate = LibraryOperationGate();
+  late final BookMutationTransaction _transaction = BookMutationTransaction(
+    bookStore: bookStore,
+    findSummary: _find,
+    saveSummary: _saveSummary,
+    notifyChanged: _notify,
+  );
+  late final BookStructureService structure = BookStructureService(
+    paths: paths,
+    bookStore: bookStore,
+    chapterStore: chapterStore,
+    gate: _gate,
+    transaction: _transaction,
+  );
+  bool get exporting => _gate.isExportReserved;
 
-  Future<T> _mutate<T>(Future<T> Function() action) async {
-    if (_exporting || _disposed) {
-      throw StateError('正在导出，暂不能修改作品。');
-    }
-    _activeWrites++;
-    try {
-      return await action();
-    } finally {
-      _activeWrites--;
-      if (_activeWrites == 0) {
-        final done = _writesDone;
-        _writesDone = null;
-        done?.complete();
-      }
-    }
+  /// 所有书库写入（含 [noteChapterSaved] 的摘要写盘）都从这里串行进入。
+  Future<T> _mutate<T>(Future<T> Function() action) => _gate.write(action);
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
   }
 
   Future<void> beginExport() async {
-    if (_exporting || _disposed) throw StateError('正在导出，请稍候。');
-    // Reserve before waiting: later writes cannot overtake this snapshot.
-    _exporting = true;
-    notifyListeners();
-    if (_activeWrites > 0) {
-      _writesDone ??= Completer<void>();
-      await _writesDone!.future;
+    // 预约必须在等待之前生效：等待期间新到的写入在入口即被拒绝。
+    _gate.reserveExport();
+    _notify();
+    try {
+      await _gate.waitForWrites();
+      if (_gate.isClosed) throw StateError('书库已关闭，不能再导出。');
+    } catch (_) {
+      endExport();
+      rethrow;
     }
   }
 
   void endExport() {
-    _exporting = false;
-    if (!_disposed) notifyListeners();
+    _gate.releaseExport();
+    _notify();
   }
 
   @override
   void dispose() {
     _disposed = true;
+    _gate.close();
     super.dispose();
   }
 
@@ -103,7 +109,7 @@ class LibraryController extends ChangeNotifier {
     }
     settings.rememberExpanded(book.id, ids.toList());
     await settings.flush();
-    notifyListeners();
+    _notify();
   }
 
   List<BookSummary> get books {
@@ -124,16 +130,16 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> _load() async {
     loading = true;
-    notifyListeners();
+    _notify();
     try {
-      _index = await libraryStore.load();
+      _index = await libraryStore.loadOrRebuild(bookStore);
       error = null;
     } catch (e) {
       error = '$e';
     } finally {
       loading = false;
       _loaded = true;
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -146,7 +152,7 @@ class LibraryController extends ChangeNotifier {
   void setSort(LibrarySort next) {
     if (sort == next) return;
     sort = next;
-    notifyListeners();
+    _notify();
   }
 
   Future<BookSummary> createBook(String rawTitle, {String notes = ''}) =>
@@ -188,7 +194,7 @@ class LibraryController extends ChangeNotifier {
       } catch (_) {}
       rethrow;
     }
-    notifyListeners();
+    _notify();
     return summary;
   }
 
@@ -219,7 +225,7 @@ class LibraryController extends ChangeNotifier {
       summary.lastOpenedChapterId = previous;
       rethrow;
     }
-    notifyListeners();
+    _notify();
   }
 
   Future<void> updateBookDetails(BookIndex book, String title, String notes) =>
@@ -230,34 +236,28 @@ class LibraryController extends ChangeNotifier {
     String title,
     String notes,
   ) async {
-    final previous = _copy(book);
-    final next = _copy(book)
+    final previous = _transaction.copy(book);
+    final next = _transaction.copy(book)
       ..title = title.trim().isEmpty ? '未命名作品' : title.trim()
       ..notes = notes;
     try {
-      await _commit(book, next);
+      await _transaction.commit(book, next);
     } catch (_) {
       // 信息编辑可补偿回滚；与跨卷目录提交不同，没有文件归属变化。
       try {
         await bookStore.save(previous);
-        _apply(book, previous);
+        _transaction.apply(book, previous);
       } catch (_) {
-        await _syncActual(book);
+        await _transaction.syncActual(book);
       }
       rethrow;
     }
   }
 
-  /// 把书内改动（卷/章标题、顺序、增删）落盘，并同步书架摘要。
-  Future<void> saveBook(BookIndex book) => _mutate(() => _saveBook(book));
-
-  Future<void> _saveBook(BookIndex book) async {
-    await bookStore.save(book);
-    await _saveSummary(book);
-  }
-
   /// 单章保存后刷新字数/时间，不重写 book.json（由 EditorController 负责）。
-  Future<void> noteChapterSaved(BookIndex book) => _saveSummary(book);
+  /// 摘要写盘同样进入写屏障：导出预约会等它结束，预约后它也会被拒绝。
+  Future<void> noteChapterSaved(BookIndex book) =>
+      _mutate(() => _saveSummary(book));
 
   Future<void> _saveSummary(BookIndex book) async {
     final BookSummary? summary = _find(book.id);
@@ -281,15 +281,16 @@ class LibraryController extends ChangeNotifier {
         rethrow;
       }
     }
-    notifyListeners();
+    _notify();
   }
 
-  Future<void> renameBook(BookSummary summary, String rawTitle) async {
-    final title = rawTitle.trim();
-    if (title.isEmpty || title == summary.title) return;
-    final book = await _mutate(() => bookStore.load(summary));
-    await updateBookDetails(book, title, book.notes);
-  }
+  Future<void> renameBook(BookSummary summary, String rawTitle) =>
+      _mutate(() async {
+        final title = rawTitle.trim();
+        if (title.isEmpty || title == summary.title) return;
+        final book = await bookStore.load(summary);
+        await _updateBookDetails(book, title, book.notes);
+      });
 
   Future<void> deleteBook(BookSummary summary) =>
       _mutate(() => _deleteBook(summary));
@@ -324,10 +325,8 @@ class LibraryController extends ChangeNotifier {
     if (settings.settings.lastOpenedBookId == summary.id) {
       settings.setLastOpenedBook(null);
     }
-    notifyListeners();
+    _notify();
   }
-
-  int wordCountOf(ChapterMeta chapter) => chapter.wordCount;
 
   String statsLine(BookSummary summary) {
     final String words = formatWordCount(summary.wordCount);
@@ -341,351 +340,5 @@ class LibraryController extends ChangeNotifier {
     return null;
   }
 
-  final Set<String> blockedBooks = <String>{};
-
-  BookIndex _copy(BookIndex book) => BookIndex.fromJson(book.toJson());
-
-  /// 先写快照，提交后才更新可见对象；失败读取真实落盘状态，绝不假回滚。
-  Future<void> _commit(BookIndex book, BookIndex next) async {
-    try {
-      await bookStore.save(next);
-      _apply(book, next);
-      await _saveSummary(book);
-    } catch (_) {
-      await _syncActual(book);
-      rethrow;
-    }
-  }
-
-  Future<void> _syncActual(BookIndex book) async {
-    try {
-      final summary = _find(book.id);
-      if (summary == null) throw StateError('作品摘要缺失');
-      _apply(book, await bookStore.load(summary));
-      blockedBooks.remove(book.id);
-    } catch (_) {
-      blockedBooks.add(book.id);
-      rethrow;
-    } finally {
-      notifyListeners();
-    }
-  }
-
-  /// 保留对象身份，编辑器仍引用同一个章对象；跨卷绑定由编辑门禁重新定位。
-  void _apply(BookIndex book, BookIndex next) {
-    final volumes = {for (final v in book.volumes) v.id: v};
-    final chapters = {for (final c in book.allChapters) c.id: c};
-    book
-      ..title = next.title
-      ..notes = next.notes;
-    final ordered = <Volume>[];
-    for (final v in next.volumes) {
-      final current = volumes[v.id] ?? v;
-      final list = <ChapterMeta>[];
-      for (final c in v.chapters) {
-        final existing = chapters[c.id] ?? c;
-        existing
-          ..title = c.title
-          ..order = c.order
-          ..wordCount = c.wordCount
-          ..updatedAt = c.updatedAt;
-        list.add(existing);
-      }
-      current
-        ..title = v.title
-        ..order = v.order
-        ..numbering = v.numbering;
-      current.chapters
-        ..clear()
-        ..addAll(list);
-      ordered.add(current);
-    }
-    book.volumes
-      ..clear()
-      ..addAll(ordered);
-    notifyListeners();
-  }
-
-  static void _normalize(BookIndex book) {
-    for (int v = 0; v < book.volumes.length; v++) {
-      book.volumes[v].order = v;
-      for (int c = 0; c < book.volumes[v].chapters.length; c++) {
-        book.volumes[v].chapters[c].order = c;
-      }
-    }
-  }
-
-  Future<ChapterMeta> appendChapter(
-    BookIndex book,
-    Volume volume, {
-    String? title,
-  }) => _mutate(() => _appendChapter(book, volume, title: title));
-
-  Future<ChapterMeta> _appendChapter(
-    BookIndex book,
-    Volume volume, {
-    String? title,
-  }) async {
-    final next = _copy(book);
-    final target = next.volumes.where((v) => v.id == volume.id).firstOrNull;
-    if (target == null) throw StateError('目标卷不属于当前作品');
-    if (target.numbering.enabled) {
-      target.numbering.validate(target.chapters.length + 1);
-    }
-    final chapter = ChapterMeta(
-      id: newId(),
-      title: title?.trim().isNotEmpty == true ? title!.trim() : '未命名章节',
-      order: target.chapters.length,
-    );
-    target.chapters.add(chapter);
-    _normalize(next);
-    await chapterStore.writeText(book.id, target.id, chapter.id, '');
-    try {
-      await _commit(book, next);
-    } catch (_) {
-      if (book.chapterById(chapter.id) == null &&
-          !blockedBooks.contains(book.id)) {
-        await chapterStore.deleteToTrash(
-          book.id,
-          target.id,
-          chapter.id,
-          title: chapter.title,
-        );
-      }
-      rethrow;
-    }
-    return book.chapterById(chapter.id)!;
-  }
-
-  Future<Volume> appendVolume(BookIndex book, {String? title}) =>
-      _mutate(() => _appendVolume(book, title: title));
-
-  Future<Volume> _appendVolume(BookIndex book, {String? title}) async {
-    final next = _copy(book);
-    final volume = Volume(
-      id: newId(),
-      title: title?.trim().isNotEmpty == true ? title!.trim() : '未命名卷',
-      order: book.volumes.length,
-    );
-    next.volumes.add(volume);
-    _normalize(next);
-    await _commit(book, next);
-    return book.volumes.firstWhere((v) => v.id == volume.id);
-  }
-
-  Future<void> setNumbering(
-    BookIndex book,
-    Volume volume,
-    ChapterNumbering rule,
-  ) => _mutate(() => _setNumbering(book, volume, rule));
-
-  Future<void> _setNumbering(
-    BookIndex book,
-    Volume volume,
-    ChapterNumbering rule,
-  ) async {
-    rule.validate(volume.chapters.length);
-    final next = _copy(book);
-    next.volumes.firstWhere((v) => v.id == volume.id).numbering = rule;
-    await _commit(book, next);
-  }
-
-  Future<void> relocateChapter(
-    BookIndex book,
-    String chapterId,
-    String targetId,
-    int insertionIndex,
-  ) => _mutate(
-    () => _relocateChapter(book, chapterId, targetId, insertionIndex),
-  );
-
-  Future<void> _relocateChapter(
-    BookIndex book,
-    String chapterId,
-    String targetId,
-    int insertionIndex,
-  ) async {
-    final next = _copy(book);
-    final source = next.volumeOfChapter(chapterId);
-    final target = next.volumes.where((v) => v.id == targetId).firstOrNull;
-    if (source == null || target == null) throw StateError('只允许同一作品内移动章节');
-    RangeError.checkValueInInterval(
-      insertionIndex,
-      0,
-      target.chapters.length,
-      'insertionIndex',
-    );
-    final chapter = next.chapterById(chapterId)!;
-    final oldIndex = source.chapters.indexOf(chapter);
-    int index = insertionIndex;
-    if (source.id == target.id && index > oldIndex) index--;
-    if (source.id == target.id && index == oldIndex) return;
-    if (target.numbering.enabled) {
-      target.numbering.validate(
-        target.chapters.length + (source.id == target.id ? 0 : 1),
-      );
-    }
-    source.chapters.remove(chapter);
-    target.chapters.insert(index, chapter);
-    _normalize(next);
-    if (source.id == target.id) {
-      await _commit(book, next);
-      return;
-    }
-    try {
-      await bookStore.moves.move(
-        bookId: book.id,
-        sourceId: source.id,
-        targetId: target.id,
-        chapterId: chapterId,
-        commitIndex: () async {
-          await bookStore.save(next);
-          _apply(book, next);
-        },
-        commitSummary: () => _saveSummary(book),
-      );
-    } catch (_) {
-      await _syncActual(book);
-      rethrow;
-    }
-    notifyListeners();
-  }
-
-  Future<void> reorderVolume(
-    BookIndex book,
-    String volumeId,
-    int insertionIndex,
-  ) => _mutate(() => _reorderVolume(book, volumeId, insertionIndex));
-
-  Future<void> _reorderVolume(
-    BookIndex book,
-    String volumeId,
-    int insertionIndex,
-  ) async {
-    RangeError.checkValueInInterval(
-      insertionIndex,
-      0,
-      book.volumes.length,
-      'insertionIndex',
-    );
-    final next = _copy(book);
-    final from = next.volumes.indexWhere((v) => v.id == volumeId);
-    if (from < 0) throw StateError('卷不属于当前作品');
-    final index = insertionIndex > from ? insertionIndex - 1 : insertionIndex;
-    if (index == from) return;
-    next.volumes.insert(index, next.volumes.removeAt(from));
-    _normalize(next);
-    await _commit(book, next);
-  }
-
-  Future<void> deleteChapter(
-    BookIndex book,
-    Volume volume,
-    ChapterMeta chapter,
-  ) => _mutate(() => _deleteChapter(book, volume, chapter));
-
-  Future<void> _deleteChapter(
-    BookIndex book,
-    Volume volume,
-    ChapterMeta chapter,
-  ) async {
-    final next = _copy(book);
-    next.volumes
-        .firstWhere((v) => v.id == volume.id)
-        .chapters
-        .removeWhere((c) => c.id == chapter.id);
-    _normalize(next);
-    // 索引提交前不移除正文；摘要失败时同样遵从真实的已提交索引。
-    try {
-      await _commit(book, next);
-    } finally {
-      if (book.chapterById(chapter.id) == null &&
-          !blockedBooks.contains(book.id)) {
-        await chapterStore.deleteToTrash(
-          book.id,
-          volume.id,
-          chapter.id,
-          title: chapter.title,
-        );
-      }
-    }
-  }
-
-  Future<void> deleteVolume(BookIndex book, Volume volume) =>
-      _mutate(() => _deleteVolume(book, volume));
-
-  Future<void> _deleteVolume(BookIndex book, Volume volume) async {
-    final removed = List<ChapterMeta>.of(volume.chapters);
-    final next = _copy(book)..volumes.removeWhere((v) => v.id == volume.id);
-    _normalize(next);
-    try {
-      await _commit(book, next);
-    } finally {
-      if (!book.volumes.any((v) => v.id == volume.id) &&
-          !blockedBooks.contains(book.id)) {
-        for (final c in removed) {
-          await chapterStore.deleteToTrash(
-            book.id,
-            volume.id,
-            c.id,
-            title: c.title,
-          );
-        }
-        final dir = Directory(paths.volumeDir(book.id, volume.id));
-        if (await dir.exists() && await dir.list().isEmpty) await dir.delete();
-      }
-    }
-  }
-
-  Future<void> moveChapter(
-    BookIndex book,
-    Volume volume,
-    ChapterMeta chapter,
-    int delta,
-  ) async {
-    final from = volume.chapters.indexWhere((c) => c.id == chapter.id);
-    final to = from + delta;
-    if (from < 0 || to < 0 || to >= volume.chapters.length) return;
-    await relocateChapter(book, chapter.id, volume.id, to > from ? to + 1 : to);
-  }
-
-  Future<void> moveVolume(BookIndex book, Volume volume, int delta) async {
-    final from = book.volumes.indexWhere((v) => v.id == volume.id);
-    final to = from + delta;
-    if (from < 0 || to < 0 || to >= book.volumes.length) return;
-    await reorderVolume(book, volume.id, to > from ? to + 1 : to);
-  }
-
-  Future<void> renameVolume(BookIndex book, Volume volume, String title) =>
-      _mutate(() => _renameVolume(book, volume, title));
-
-  Future<void> _renameVolume(
-    BookIndex book,
-    Volume volume,
-    String title,
-  ) async {
-    final name = title.trim();
-    if (name == volume.title) return;
-    final next = _copy(book);
-    next.volumes.firstWhere((v) => v.id == volume.id).title = name;
-    await _commit(book, next);
-  }
-
-  Future<void> renameChapter(
-    BookIndex book,
-    ChapterMeta chapter,
-    String title,
-  ) => _mutate(() => _renameChapter(book, chapter, title));
-
-  Future<void> _renameChapter(
-    BookIndex book,
-    ChapterMeta chapter,
-    String title,
-  ) async {
-    final name = title.trim();
-    if (name == chapter.title) return;
-    final next = _copy(book);
-    next.chapterById(chapter.id)!.title = name;
-    await _commit(book, next);
-  }
+  Set<String> get blockedBooks => _transaction.blockedBooks;
 }

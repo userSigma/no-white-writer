@@ -59,10 +59,14 @@ void main() {
       final opening = await h.app.library.openBook(summary);
       final volume = opening.volumes.first;
       await h.app.library.setVolumeExpanded(opening, volume.id, true);
-      await h.app.library.renameVolume(opening, volume, '第1卷');
+      await h.app.library.structure.renameVolume(opening, volume, '第1卷');
       // 新建作品自带一个默认章，直接复用为第一，其余追加。
       final existing = volume.chapters.first;
-      await h.app.library.renameChapter(opening, existing, chapterTitles.first);
+      await h.app.library.structure.renameChapter(
+        opening,
+        existing,
+        chapterTitles.first,
+      );
       await h.app.chapterStore.writeText(
         opening.id,
         volume.id,
@@ -70,8 +74,15 @@ void main() {
         bodies.first,
       );
       for (var i = 1; i < chapterTitles.length; i++) {
-        final chapter = await h.app.library.appendChapter(opening, volume);
-        await h.app.library.renameChapter(opening, chapter, chapterTitles[i]);
+        final chapter = await h.app.library.structure.appendChapter(
+          opening,
+          volume,
+        );
+        await h.app.library.structure.renameChapter(
+          opening,
+          chapter,
+          chapterTitles[i],
+        );
         // 正文按存储层预置，导出只读磁盘，绕开编辑器防抖时序。
         await h.app.chapterStore.writeText(
           opening.id,
@@ -260,16 +271,16 @@ void main() {
       final index = await h.app.library.openBook(s);
       final first = index.volumes.first;
       await h.app.library.setVolumeExpanded(index, first.id, true);
-      await h.app.library.renameVolume(index, first, '第一卷');
+      await h.app.library.structure.renameVolume(index, first, '第一卷');
       final chapter = first.chapters.first;
-      await h.app.library.renameChapter(index, chapter, '首章');
+      await h.app.library.structure.renameChapter(index, chapter, '首章');
       await h.app.chapterStore.writeText(index.id, first.id, chapter.id, '正文');
       await h.app.editor.open(
         inBook: index,
         inVolume: first,
         inChapter: chapter,
       );
-      await h.app.library.appendVolume(index, title: '空卷');
+      await h.app.library.structure.appendVolume(index, title: '空卷');
       return s;
     }))!;
     await tester.pumpWidget(NoWhiteWriterApp(app: h.app));
@@ -306,7 +317,11 @@ void main() {
       final created = await h.app.library.createBook('空书导出');
       final index = await h.app.library.openBook(created);
       final volume = index.volumes.first;
-      await h.app.library.deleteChapter(index, volume, volume.chapters.first);
+      await h.app.library.structure.deleteChapter(
+        index,
+        volume,
+        volume.chapters.first,
+      );
       return created;
     }))!;
     await tester.pumpWidget(NoWhiteWriterApp(app: h.app));
@@ -337,7 +352,7 @@ void main() {
         index.volumes.first.id,
         true,
       );
-      final chapter = await h.app.library.appendChapter(
+      final chapter = await h.app.library.structure.appendChapter(
         index,
         index.volumes.first,
       );
@@ -434,7 +449,11 @@ void main() {
     await pumpEditor(tester, h, book);
     await openChapterMenu(tester, victim.id);
     await tester.runAsync(() async {
-      await h.app.library.deleteChapter(book, book.volumes.first, victim);
+      await h.app.library.structure.deleteChapter(
+        book,
+        book.volumes.first,
+        victim,
+      );
     });
     await tester.tap(find.text('导出本章'));
     await finishIo(tester, until: () => find.text('重试').evaluate().isNotEmpty);
@@ -505,15 +524,19 @@ void main() {
       final opening = await h.app.library.openBook(summary);
       final volume = opening.volumes.first;
       await h.app.library.setVolumeExpanded(opening, volume.id, true);
-      await h.app.library.renameVolume(opening, volume, '');
-      await h.app.library.renameChapter(opening, volume.chapters.first, '');
+      await h.app.library.structure.renameVolume(opening, volume, '');
+      await h.app.library.structure.renameChapter(
+        opening,
+        volume.chapters.first,
+        '',
+      );
       await h.app.chapterStore.writeText(
         opening.id,
         volume.id,
         volume.chapters.first.id,
         '甲',
       );
-      await h.app.library.setNumbering(
+      await h.app.library.structure.setNumbering(
         opening,
         volume,
         const ChapterNumbering(
@@ -523,12 +546,15 @@ void main() {
           suffix: '',
         ),
       );
-      final second = await h.app.library.appendVolume(opening);
-      await h.app.library.renameVolume(opening, second, '');
-      final other = await h.app.library.appendChapter(opening, second);
-      await h.app.library.renameChapter(opening, other, '');
+      final second = await h.app.library.structure.appendVolume(opening);
+      await h.app.library.structure.renameVolume(opening, second, '');
+      final other = await h.app.library.structure.appendChapter(
+        opening,
+        second,
+      );
+      await h.app.library.structure.renameChapter(opening, other, '');
       await h.app.chapterStore.writeText(opening.id, second.id, other.id, '乙');
-      await h.app.library.setNumbering(
+      await h.app.library.structure.setNumbering(
         opening,
         second,
         const ChapterNumbering(
@@ -620,7 +646,10 @@ void main() {
       bodies: ['正文'],
     );
     final empty = (await tester.runAsync(() async {
-      final volume = await h.app.library.appendVolume(book, title: '空卷');
+      final volume = await h.app.library.structure.appendVolume(
+        book,
+        title: '空卷',
+      );
       await h.app.library.setVolumeExpanded(book, volume.id, true);
       return volume;
     }))!;
@@ -659,7 +688,11 @@ void main() {
       final opening = await h.app.library.openBook(summary);
       final volume = opening.volumes.first;
       await h.app.library.setVolumeExpanded(opening, volume.id, true);
-      await h.app.library.renameChapter(opening, volume.chapters.first, '并发章');
+      await h.app.library.structure.renameChapter(
+        opening,
+        volume.chapters.first,
+        '并发章',
+      );
       await h.app.chapterStore.writeText(
         opening.id,
         volume.id,

@@ -18,6 +18,7 @@ class AppPaths {
   String get logsDir => pathJoin(dataRoot.path, 'logs');
   String get booksDir => pathJoin(dataRoot.path, 'books');
   String get trashDir => pathJoin(dataRoot.path, 'trash');
+  String get languagesDir => pathJoin(dataRoot.path, 'languages');
 
   String bookDir(String bookId) => pathJoin(booksDir, bookId);
   File bookFile(String bookId) => File(pathJoin(bookDir(bookId), 'book.json'));
@@ -39,5 +40,7 @@ class AppPaths {
     await Directory(logsDir).create(recursive: true);
     await Directory(booksDir).create(recursive: true);
     await Directory(trashDir).create(recursive: true);
+    // languages/：用户可放入自定义语言包 JSON（i18n 可插拔语言）。
+    await Directory(languagesDir).create(recursive: true);
   }
 }

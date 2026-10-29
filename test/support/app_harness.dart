@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:no_white_writer/app_context.dart';
+import 'package:no_white_writer/core/i18n/i18n.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/storage/app_paths.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
@@ -27,6 +28,7 @@ class AppHarness {
     app.editor.dispose();
     await app.settings.flush();
     app.settings.dispose();
+    app.i18n.dispose();
     app.library.dispose();
     await root.delete(recursive: true);
   }
@@ -62,6 +64,7 @@ Future<AppHarness> createHarness({
     library: library,
     settings: settings,
   );
+  final I18nController i18n = I18nController();
   await library.load();
   return AppHarness(
     AppContext(
@@ -76,6 +79,7 @@ Future<AppHarness> createHarness({
       settings: settings,
       library: library,
       editor: editor,
+      i18n: i18n,
       instanceLock: InstanceLock('${root.path}/instance.lock'),
     ),
     root,

@@ -38,8 +38,8 @@ class ChapterStore {
   File _tmpOf(File txt) => File('${txt.path}.tmp');
   File _bakOf(File txt) => File('${txt.path}.bak');
 
-  /// 返回归一化后的正文：UTF-8 解码、去 BOM、`\r\n`/`\r` → `\n`。
-  /// 文件不存在返回 null（由 UI 显示「缺章」提示）。
+  /// 返回归一化后的正文：严格 UTF-8 解码、去 BOM、`\r\n`/`\r` → `\n`。
+  /// 只有文件不存在才返回 null；读取或解码失败由上层阻止写入。
   Future<String?> readText(
     String bookId,
     String volumeId,
@@ -56,12 +56,12 @@ class ChapterStore {
         'chapter': chapterId,
         'error': '$error',
       });
-      return null;
+      rethrow;
     }
   }
 
   static String normalize(List<int> bytes) {
-    String text = utf8.decode(bytes, allowMalformed: true);
+    String text = utf8.decode(bytes, allowMalformed: false);
     if (text.startsWith('\uFEFF')) text = text.substring(1);
     return text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
   }
@@ -125,6 +125,7 @@ class ChapterStore {
   }
 
   /// 启动时的崩溃恢复判定（PLAN.md §4.10 的 6 行判定表）。
+  /// 正文或备份恢复失败必须抛出，禁止带着不完整现场继续写入。
   Future<List<RecoveryRecord>> recover(BookIndex book) async {
     final List<RecoveryRecord> records = <RecoveryRecord>[];
     for (final Volume volume in book.volumes) {
@@ -154,6 +155,7 @@ class ChapterStore {
                 'chapter.recover.tmp.failed',
                 <String, Object?>{'chapter': chapter.id, 'error': '$error'},
               );
+              rethrow;
             }
           } else {
             try {
@@ -177,6 +179,7 @@ class ChapterStore {
                 'chapter.recover.bak.failed',
                 <String, Object?>{'chapter': chapter.id, 'error': '$error'},
               );
+              rethrow;
             }
           } else {
             records.add(_record(book, volume, chapter, 'missing'));
@@ -191,7 +194,13 @@ class ChapterStore {
             try {
               await bak.copy(txt.path);
               records.add(_record(book, volume, chapter, 'bak'));
-            } catch (_) {}
+            } catch (error) {
+              AppLogger.instance.error(
+                'chapter.recover.bak.failed',
+                <String, Object?>{'chapter': chapter.id, 'error': '$error'},
+              );
+              rethrow;
+            }
           }
         }
       }

@@ -1,4 +1,5 @@
 import 'core/platform/platform_services.dart';
+import 'core/i18n/i18n.dart';
 import 'core/storage/app_paths.dart';
 import 'core/storage/book_store.dart';
 import 'core/storage/chapter_store.dart';
@@ -24,6 +25,7 @@ class AppContext {
     required this.settings,
     required this.library,
     required this.editor,
+    required this.i18n,
     required this.instanceLock,
     this.exportReader,
     this.recovered = const <RecoveryRecord>[],
@@ -39,6 +41,7 @@ class AppContext {
   final SettingsController settings;
   final LibraryController library;
   final EditorController editor;
+  final I18nController i18n;
   final ExportSnapshotStore? exportReader;
   ExportController? _exporter;
   ExportController get exporter => _exporter ??= ExportController(

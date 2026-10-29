@@ -39,14 +39,14 @@ void main() {
         final b = await h.app.library.openBook(s);
         source = b.volumes.first;
         chapter = source.chapters.first;
-        target = await h.app.library.appendVolume(b, title: '目标卷');
+        target = await h.app.library.structure.appendVolume(b, title: '目标卷');
         await h.app.library.setVolumeExpanded(b, source.id, true);
-        await h.app.library.setNumbering(
+        await h.app.library.structure.setNumbering(
           b,
           source,
           const ChapterNumbering(enabled: true),
         );
-        await h.app.library.setNumbering(
+        await h.app.library.structure.setNumbering(
           b,
           target,
           const ChapterNumbering(enabled: true, padding: 3),
@@ -178,8 +178,12 @@ void main() {
       final s = await h.app.library.createBook('排序');
       final book = await h.app.library.openBook(s);
       a = book.volumes.first;
-      second = await h.app.library.appendChapter(book, a, title: '第二章');
-      b = await h.app.library.appendVolume(book, title: '第二卷');
+      second = await h.app.library.structure.appendChapter(
+        book,
+        a,
+        title: '第二章',
+      );
+      b = await h.app.library.structure.appendVolume(book, title: '第二卷');
       await h.app.library.setVolumeExpanded(book, a.id, true);
       return book;
     }))!;
@@ -276,9 +280,9 @@ void main() {
       final b = await h.app.library.openBook(s);
       source = b.volumes.first;
       for (int i = 0; i < 20; i++) {
-        await h.app.library.appendChapter(b, source, title: '长章$i');
+        await h.app.library.structure.appendChapter(b, source, title: '长章$i');
       }
-      target = await h.app.library.appendVolume(b, title: '底部目标');
+      target = await h.app.library.structure.appendVolume(b, title: '底部目标');
       await h.app.library.setVolumeExpanded(b, source.id, true);
       return b;
     }))!;
@@ -347,8 +351,8 @@ void main() {
       final s = await h.app.library.createBook('键盘移动');
       final book = await h.app.library.openBook(s);
       a = book.volumes.first;
-      await h.app.library.appendChapter(book, a, title: '另一章');
-      b = await h.app.library.appendVolume(book, title: '目标卷');
+      await h.app.library.structure.appendChapter(book, a, title: '另一章');
+      b = await h.app.library.structure.appendVolume(book, title: '目标卷');
       await h.app.library.setVolumeExpanded(book, a.id, true);
       return book;
     }))!;
