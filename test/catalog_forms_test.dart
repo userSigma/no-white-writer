@@ -130,8 +130,8 @@ void main() {
     final book = (await tester.runAsync(() async {
       final summary = await h.app.library.createBook('占位');
       final b = await h.app.library.openBook(summary);
-      await h.app.library.renameVolume(b, b.volumes.first, '');
-      await h.app.library.renameChapter(b, b.allChapters.first, '');
+      await h.app.library.structure.renameVolume(b, b.volumes.first, '');
+      await h.app.library.structure.renameChapter(b, b.allChapters.first, '');
       return b;
     }))!;
     final v = book.volumes.first;
@@ -177,7 +177,7 @@ void main() {
       final book = (await tester.runAsync(() async {
         final s = await h.app.library.createBook('章菜单空名');
         final b = await h.app.library.openBook(s);
-        await h.app.library.appendChapter(b, b.volumes.first);
+        await h.app.library.structure.appendChapter(b, b.volumes.first);
         return b;
       }))!;
       final v = book.volumes.first;
@@ -216,7 +216,7 @@ void main() {
       final book = (await tester.runAsync(() async {
         final s = await h.app.library.createBook('章名失败草稿');
         final b = await h.app.library.openBook(s);
-        await h.app.library.appendChapter(b, b.volumes.first);
+        await h.app.library.structure.appendChapter(b, b.volumes.first);
         return b;
       }))!;
       final v = book.volumes.first;

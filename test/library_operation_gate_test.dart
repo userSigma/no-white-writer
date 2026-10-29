@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
+import 'package:no_white_writer/core/storage/book_store.dart';
+import 'package:no_white_writer/state/library_controller.dart';
 
 import 'support/app_harness.dart';
 
@@ -46,6 +48,35 @@ class _ConcurrencyWriter extends AtomicFileWriter {
   }
 }
 
+class _HoldingBookStore extends BookStore {
+  _HoldingBookStore(AppHarness h, AtomicFileWriter writer)
+    : super(h.app.paths, writer, h.app.chapterStore);
+
+  bool holdNextLoad = false;
+  final loadEntered = Completer<void>();
+  final releaseLoad = Completer<void>();
+
+  @override
+  Future<BookIndex> load(BookSummary summary) async {
+    final book = await super.load(summary);
+    if (holdNextLoad) {
+      holdNextLoad = false;
+      loadEntered.complete();
+      await releaseLoad.future;
+    }
+    return book;
+  }
+}
+
+LibraryController _libraryWith(AppHarness h, BookStore store) =>
+    LibraryController(
+      paths: h.app.paths,
+      libraryStore: h.app.libraryStore,
+      bookStore: store,
+      chapterStore: h.app.chapterStore,
+      settings: h.app.settings,
+    );
+
 Future<(BookSummary, BookIndex, Volume, ChapterMeta)> _openChapter(
   AppHarness h,
 ) async {
@@ -67,9 +98,17 @@ void main() {
     final (summary, book, volume, chapter) = await _openChapter(h);
 
     writer.holdFirstBookWrite = true;
-    final volumeRename = h.app.library.renameVolume(book, volume, '卷名甲');
+    final volumeRename = h.app.library.structure.renameVolume(
+      book,
+      volume,
+      '卷名甲',
+    );
     await writer.firstBookWriteEntered.future;
-    final chapterRename = h.app.library.renameChapter(book, chapter, '章名乙');
+    final chapterRename = h.app.library.structure.renameChapter(
+      book,
+      chapter,
+      '章名乙',
+    );
     writer.releaseFirstBookWrite.complete();
     await Future.wait<void>([volumeRename, chapterRename]);
 
@@ -113,17 +152,17 @@ void main() {
 
     writer.bookWriteFailures = 1;
     await expectLater(
-      h.app.library.renameVolume(book, volume, '失败卷名'),
+      h.app.library.structure.renameVolume(book, volume, '失败卷名'),
       throwsA(isA<FileSystemException>()),
     );
     expect(h.app.library.blockedBooks.contains(book.id), isFalse);
 
-    await h.app.library.renameChapter(book, chapter, '失败后的章名');
+    await h.app.library.structure.renameChapter(book, chapter, '失败后的章名');
     await h.app.library.beginExport();
     try {
       expect(h.app.library.exporting, isTrue);
       await expectLater(
-        h.app.library.appendVolume(book),
+        h.app.library.structure.appendVolume(book),
         throwsA(isA<StateError>()),
       );
     } finally {
@@ -144,9 +183,17 @@ void main() {
 
     writer.holdFirstBookWrite = true;
     writer.libraryWriteFailures = 1;
-    final volumeRename = h.app.library.renameVolume(book, volume, '已提交卷名');
+    final volumeRename = h.app.library.structure.renameVolume(
+      book,
+      volume,
+      '已提交卷名',
+    );
     await writer.firstBookWriteEntered.future;
-    final chapterRename = h.app.library.renameChapter(book, chapter, '后续章名');
+    final chapterRename = h.app.library.structure.renameChapter(
+      book,
+      chapter,
+      '后续章名',
+    );
     writer.releaseFirstBookWrite.complete();
     await expectLater(volumeRename, throwsA(isA<FileSystemException>()));
     await chapterRename;
@@ -163,6 +210,77 @@ void main() {
     expect(h.app.library.blockedBooks.contains(book.id), isFalse);
   });
 
+  test('作品重命名从读取到提交保持同一预约边界', () async {
+    final h = await createHarness();
+    addTearDown(h.dispose);
+    final store = _HoldingBookStore(h, const AtomicFileWriter());
+    final library = _libraryWith(h, store);
+    addTearDown(library.dispose);
+    await library.load();
+    final summary = await library.createBook('旧作品名');
+
+    store.holdNextLoad = true;
+    final renaming = library.renameBook(summary, '新作品名');
+    final renameOutcome = renaming.then<Object?>(
+      (_) => null,
+      onError: (Object error) => error,
+    );
+    await store.loadEntered.future;
+    final reservation = library.beginExport();
+    expect(library.exporting, isTrue);
+    store.releaseLoad.complete();
+    try {
+      expect(await renameOutcome, isNull);
+      await reservation;
+      expect((await h.app.bookStore.load(summary)).title, '新作品名');
+      expect(summary.title, '新作品名');
+    } finally {
+      await reservation;
+      library.endExport();
+    }
+  });
+
+  test('关闭中的既有提交完成，排队请求和等待中的导出明确失败', () async {
+    final writer = _ConcurrencyWriter();
+    final h = await createHarness(writer: writer);
+    addTearDown(h.dispose);
+    final library = _libraryWith(h, h.app.bookStore);
+    var disposed = false;
+    addTearDown(() {
+      if (!disposed) library.dispose();
+    });
+    await library.load();
+    final summary = await library.createBook('关闭中作品');
+    final book = await library.openBook(summary);
+    final volume = book.volumes.single;
+    final chapter = volume.chapters.single;
+
+    writer.holdFirstBookWrite = true;
+    final active = library.structure.renameVolume(book, volume, '已受理卷名');
+    final activeOutcome = active.then<Object?>(
+      (_) => null,
+      onError: (Object error) => error,
+    );
+    await writer.firstBookWriteEntered.future;
+    final queued = library.structure.renameChapter(book, chapter, '不应执行章名');
+    final queuedCheck = expectLater(queued, throwsA(isA<StateError>()));
+    final reservation = library.beginExport();
+    final reservationCheck = expectLater(
+      reservation,
+      throwsA(isA<StateError>()),
+    );
+    library.dispose();
+    disposed = true;
+    writer.releaseFirstBookWrite.complete();
+    expect(await activeOutcome, isNull);
+    await queuedCheck;
+    await reservationCheck;
+    expect(library.exporting, isFalse);
+    final saved = await h.app.bookStore.load(summary);
+    expect(saved.volumes.single.title, '已受理卷名');
+    expect(saved.allChapters.single.title, '未命名章节');
+  });
+
   test('书库控制器关闭后拒绝写入和导出预约', () async {
     final h = await createHarness();
     var disposed = false;
@@ -174,7 +292,7 @@ void main() {
     disposed = true;
 
     await expectLater(
-      h.app.library.appendVolume(book),
+      h.app.library.structure.appendVolume(book),
       throwsA(isA<StateError>()),
     );
     await expectLater(h.app.library.beginExport(), throwsA(isA<StateError>()));

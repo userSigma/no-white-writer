@@ -29,7 +29,7 @@ void main() {
     expect(saved.expandedVolumes[book.id], [v.id]);
     await h.app.library.setVolumeExpanded(book, v.id, false);
     await workspace.change(() async {
-      await h.app.library.appendChapter(book, v);
+      await h.app.library.structure.appendChapter(book, v);
     });
     expect(h.app.library.expandedVolumesOf(book), isEmpty);
     expect(
@@ -45,7 +45,7 @@ void main() {
     final book = await h.app.library.openBook(summary);
     final source = book.volumes.first;
     final chapter = source.chapters.first;
-    final target = await h.app.library.appendVolume(book);
+    final target = await h.app.library.structure.appendVolume(book);
     final w = WorkspaceController(
       book: book,
       library: h.app.library,

@@ -1,7 +1,7 @@
 # 环境与构建记录（不白写作）
 
 > 本文件只记录「这台机器上实际验证过的环境事实」，与 [根计划](<../PLAN.md>) 的规格分开。
-> 最近一次核对：2026-10-27（0.4.0+4 无框目录、设置菜单与三级导出的新鲜证据见 §9；§5–§8 保留历史）。
+> 最近一次核对：2026-10-29（P1 原生交互复验见 §11；普通启动失败及修正交付验证见 §10；0.4.0+4 的历史证据见 §9，§5–§8 保留历史）。
 
 ## 1. 工具链
 
@@ -60,11 +60,29 @@ $env:NWW_DEV_PAGE = 'editor'
 cd C:\Users\userSigma\no-white-writer
 flutter pub get
 flutter analyze          # 期望 No issues found!
-flutter test             # 0.4.0：280 tests, All tests passed!
+flutter test             # 2026-10-28 P1：327 tests, All tests passed!
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool\fix_plugin_symlinks.ps1
 flutter build windows --release
 # 产物：build\windows\x64\runner\Release\no_white_writer.exe
+
+# 普通启动检查：构建成功 ≠ 能正常启动（本机构建目录产物可能带 Low 完整性
+# 标签，见 §6、§10）。凡声称“构建通过 / 可交付”，必须接着跑：
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool\verify_normal_startup.ps1
 ```
+
+`verify_normal_startup.ps1` 的 PASS 判据（缺一即 FAIL，不允许用 `NWW_DATA_ROOT`
+等开发变量替代默认路径）：
+
+1. Release 全部文件打包为 ZIP 并解压到 Downloads 下普通目录，逐一 SHA-256
+   与构建源一致，解压后 exe 无 `Low Mandatory Level` 标签；
+2. 不设任何开发环境变量、用默认 `%APPDATA%\不白写作` 启动，出现标题为
+   「不白写作」的窗口；
+3. 正常关窗退出，退出码 0，stderr 无 Dart 异常；
+4. 启动前后默认作品目录文件哈希不变。
+
+证据写入 `.devdata/verify-normal-startup-<时间戳>/` 与
+`.devdata/verify-normal-startup-latest.json`；单实例锁被占用时会 FAIL，
+先确认没有其他实例再复跑。
 
 ## 5. M1 实测结果（2026-10-26）
 
@@ -184,4 +202,41 @@ SHA-256：`148E4281F9DD44BC9491B6B0D830F90C50A3B1BF45FC8617B96E8FD2A48625AB`。
 - 其他平台未构建；本轮不重复声称默认 AppData 普通启动通过，§6 的初始化异常 UI 提示缺口仍保留。没有关闭作者实例，也没有改已有作品、运行目录或旧发布包。
 - 以本轮 14:38 的 **87 文件**保护快照对照，实际 lib 差异 **20 条路径（6 新、13 改、1 删；2084 增／808 删）**，见 [逐路径清单](<../.devdata/section20/final-scope.json>) 与 [最终 diff](<../.devdata/section20/final-review-lib.diff>)；不是把未跟踪原 M1 都归为本轮新增。分支 `ui/writing-workspace`、HEAD `faa3f88f8080e784eb66f81a691ef159dd171ea1`，未用代理／队友，未提交、合并或推送，未 reset／clean。
 
+## 10. P1 普通启动故障与修正交付（2026-10-28）
+
+### 复现与根因
+
+- P1 Windows release 构建成功不等于普通启动成功。用户报告后，在不设置 `NWW_DATA_ROOT` 等开发变量的情况下复现：进程存活、没有窗口，stderr 为 `PathAccessException: Creation failed`，目标为默认 `%APPDATA%/不白写作/languages`，`errno = 5`；失败位于 [AppPaths.ensureLayout](<../lib/core/storage/app_paths.dart#L44>)，尚未进入 P1 控制器逻辑。见[普通启动 RED](<../.devdata/p1-normal-startup-red.log>)。
+- 原构建 exe 仍继承 `Mandatory Label/Low Mandatory Level:(I)(NW)`；六个已有无窗口进程的完整性均为 `S-1-16-4096`（Low），启动 shell 为 `S-1-16-8192`（Medium）。相同字节在隔离数据目录可启动，复制为正常发布包后也可使用默认数据根，印证是 §6 所述的产物安全标签问题，而非 P1 重构回归。
+- 本次只修正交付位置与普通启动验收，不降低数据目录权限、不修改业务代码、不清理或迁移作品、不强杀用户原有进程；原 Low 标签构建路径仍不应作为日常启动入口。
+
+### 可用交付与验证
+
+- [完整 ZIP](<../build/packages/no-white-writer-0.4.1-p1-windows-x64-20261028-235311.zip>)：SHA-256 `A36D097C15FE24DFB35DA1AA24E2557CA63C8162FDEF5A07BC46AAE8BFD67726`。包含 P1 的现有 release，未更换二进制或伪称重新构建。
+- 已解压到普通目录 `C:/Users/userSigma/Downloads/no-white-writer-0.4.1-p1-windows-x64-20261028-235311`，从[该目录 exe](<C:/Users/userSigma/Downloads/no-white-writer-0.4.1-p1-windows-x64-20261028-235311/no_white_writer.exe>)启动；必须保留同目录 DLL 和 data，不能仅复制 exe，也不要解压回旧 Low 构建目录。
+- 发布包全部 **21 个文件**逐一与构建源做 SHA-256 比对；启动后再比对仍一致。提取后的 exe 无 Low 标签，实际 PID **35628** 为 Medium，未设置开发环境变量，默认 AppData 初始化成功，窗口标题准确为「不白写作」。
+- 发出正常关窗请求后退出码 **0**；stderr 只有 Impeller 后端说明，无 Dart 异常。默认作品目录全部 **6 个文件**启动前后哈希不变；另与第一次正常启动前的快照复核，同样未变。所有本轮测试进程均已退出，用户此前的无窗口进程未处理。
+- [最终原生验证日志](<../.devdata/p1-package-and-launch-final.log>)、[发布与启动验证脚本](<../.devdata/p1-package-and-launch.ps1>)、[源文件清单](<../.devdata/p1-release-startup-20261028-235311/source-manifest.json>)。
+- 第一次验证脚本因未预先保留 PowerShell 进程句柄而读到空 `ExitCode`，不能算完整通过；补充句柄保留后，以上最终一轮完整通过。启动异常的界面提示仍是既有稳健性待办；本轮不扩大为初始化流程重构，亦不把启动验收外推为完整中文 IME／目录拖动的原生人工验收。
+
+## 11. P1 原生交互复验（2026-10-29）
+
+### 范围与隔离
+
+- 使用当前 P1 Windows x64 release，通过真实窗口鼠标、键盘完成第 8 节主流程。数据根为 `.devdata/p1-native-acceptance-20261029-0030/data`，导出根为同目录下 `exports`；仅创建合成作品 `P1 Native Acceptance`，未读取或修改默认 AppData 作品，未操作启动前已有的六个同路径无窗口进程。
+- 首次实例 PID **32876**，重启实例 PID **27352**，两次均通过原生窗口关闭并确认进程退出；两份 stderr 均只有 Impeller 后端说明，无 Dart 异常。启动、重启及应用日志均保留在上述验收根。
+
+### 实际结果
+
+- **自动保存：** 新建 `P1 Autosave Chapter`，输入英文正文后，界面从「未保存 25 字」变为「已保存 · 刚刚 25 字」；TXT 与 `book.json` 均为 25 字。[应用日志](<../.devdata/p1-native-acceptance-20261029-0030/data/logs/app.log>)记录 `2026-10-29 00:34:18.866 chapter.saved words: 25`。
+- **跨卷移动：** 通过真实鼠标握柄把章 ID `8859d06d-210d-44bb-ad58-f306f519d39d` 从源卷 `5719c44e-0358-4104-be27-368b9eb1734d` 拖入折叠目标卷 `08af4174-2ffb-4096-baba-769b8c1d2526`。展开目标卷后 UI 归属正确，源 TXT／BAK 消失且目标出现；TXT SHA-256 前后均为 `152025c423d35e6562bfcfb1d451cec288550831f86610850f275f607b2c5ac1`，空 BAK 的 SHA-256 前后均为 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`。
+- **删除：** 新建 `P1 Disposable Chapter`，经章节菜单及确认框删除；目录从 2 章回退为 1 章，当前选择回退到 `P1 Autosave Chapter`，重启后未复活。
+- **导出：** 在设置中显式保存本轮隔离导出根，通过章节菜单执行「导出本章」；完成提示及实际路径正确。[导出 TXT](<../.devdata/p1-native-acceptance-20261029-0030/exports/P1 Native Acceptance/P1 Target Volume/P1 Autosave Chapter.txt>)的 UTF-8 正文逐字为 `P1 native autosave body 0029.`。
+- **设置：** 从「跟随系统」切到「深色（纯黑）」后界面立即变黑；重启后深色主题及隔离导出目录仍正确回显。
+- **关窗保存与重启：** 在正文追加 `P1 close flush 0048.` 后不等待自动保存，立即点击原生关闭。日志依次为 `00:43:47.273 app.exit.requested`、`00:43:47.347 chapter.saved words: 42`、`00:43:47.365 app.exit.accepted`；磁盘正文完整。使用同一数据根重启后，保留章仍位于目标卷，正文含关窗标记且统计为 42 字，删除章、主题和导出目录状态均符合预期。
+
+### 边界
+
+- 移动前一次 `Ctrl+ArrowDown` 未产生可见移动，随后改用真实拖放完成验收；不把该次尝试记为原生组合键通过，也不据此断言业务回归。键盘移动仍由既有组件回归覆盖。
+- 原生输入采用英文文本粘贴，不等于微软／搜狗中文候选窗、中文长句、撤销重做或完整 IME 人工验收；未覆盖多屏、150%／200% DPI、系统文字缩放及完整无障碍读屏矩阵。本轮只闭环 P1 指定主流程，未扩展生产代码或 P2 范围。
 

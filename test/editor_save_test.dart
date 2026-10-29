@@ -197,7 +197,10 @@ void main() {
     final AppHarness h = await createHarness();
     addTearDown(h.dispose);
     final (summary, book, volume, first) = await openFirst(h);
-    final ChapterMeta next = await h.app.library.appendChapter(book, volume);
+    final ChapterMeta next = await h.app.library.structure.appendChapter(
+      book,
+      volume,
+    );
     titleOf(h.app.editor).text = '第一章草稿标题';
     h.app.editor.text.text = '第一章草稿正文';
     await h.app.editor.open(inBook: book, inVolume: volume, inChapter: next);
@@ -211,7 +214,7 @@ void main() {
     );
     expect(h.app.editor.text.text, '');
     expect(await h.app.editor.close(), isTrue);
-    await h.app.library.deleteChapter(book, volume, next);
+    await h.app.library.structure.deleteChapter(book, volume, next);
     await h.app.editor.saveNow(force: true);
     expect(
       h.app.chapterStore.fileOf(book.id, volume.id, next.id).existsSync(),
