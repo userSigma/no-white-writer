@@ -107,9 +107,9 @@ class _NumberingSettingsDialogState extends State<NumberingSettingsDialog> {
     final w = widget.workspace;
     final ok = await w.change(() {
       if (_isGlobal) {
-        return w.library.setGlobalNumbering(w.book, rule);
+        return w.library.structure.setGlobalNumbering(w.book, rule);
       }
-      return w.library.setNumbering(w.book, widget.volume!, rule);
+      return w.library.structure.setNumbering(w.book, widget.volume!, rule);
     });
     if (!mounted) return;
     if (ok) {

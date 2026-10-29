@@ -22,12 +22,12 @@ void main() {
     h.app.editor.text.text = '只导出正文\n';
     await h.app.editor.flush();
     await h.app.editor.runStructure(b, () async {
-      await h.app.library.setVolumeNumberingMode(
+      await h.app.library.structure.setVolumeNumberingMode(
         b,
         v,
         VolumeNumberingMode.independent,
       );
-      await h.app.library.setNumbering(
+      await h.app.library.structure.setNumbering(
         b,
         v,
         const ChapterNumbering(
@@ -54,7 +54,7 @@ void main() {
     // 切回跟随全局且全局关闭：导出文件名随之失去编号前缀。
     await h.app.editor.runStructure(
       b,
-      () => h.app.library.setVolumeNumberingMode(
+      () => h.app.library.structure.setVolumeNumberingMode(
         b,
         v,
         VolumeNumberingMode.followGlobal,
@@ -67,7 +67,7 @@ void main() {
     // 跟随全局 + 全局开启：文件名改用全局规则（跨卷连续序号）。
     await h.app.editor.runStructure(
       b,
-      () => h.app.library.setGlobalNumbering(
+      () => h.app.library.structure.setGlobalNumbering(
         b,
         const ChapterNumbering(enabled: true, prefix: '', suffix: '', start: 1),
       ),
@@ -82,7 +82,7 @@ void main() {
     final b = (await tester.runAsync(() async {
       final s = await h.app.library.createBook('窗口名');
       final b = await h.app.library.openBook(s);
-      await h.app.library.setVolumeNumberingMode(
+      await h.app.library.structure.setVolumeNumberingMode(
         b,
         b.volumes.first,
         VolumeNumberingMode.independent,
@@ -109,9 +109,9 @@ void main() {
     final b = (await tester.runAsync(() async {
       final s = await h.app.library.createBook('全局窗口');
       final b = await h.app.library.openBook(s);
-      final v2 = await h.app.library.appendVolume(b);
-      await h.app.library.appendChapter(b, v2);
-      await h.app.library.setGlobalNumbering(
+      final v2 = await h.app.library.structure.appendVolume(b);
+      await h.app.library.structure.appendChapter(b, v2);
+      await h.app.library.structure.setGlobalNumbering(
         b,
         const ChapterNumbering(enabled: true),
       );

@@ -146,7 +146,7 @@ void main() {
     final h = await createHarness();
     addTearDown(h.dispose);
     final (book, volume, current) = await _open(h);
-    final other = await h.app.library.appendChapter(
+    final other = await h.app.library.structure.appendChapter(
       book,
       volume,
       title: '非当前章',
@@ -176,21 +176,28 @@ void main() {
     h.app.editor.title.text = '第一';
     h.app.editor.text.text = '甲';
     expect(await h.app.editor.flush(), isTrue);
-    await h.app.library.renameVolume(book, first, '正文卷');
-    final second = await h.app.library.appendChapter(book, first, title: '第二');
+    await h.app.library.structure.renameVolume(book, first, '正文卷');
+    final second = await h.app.library.structure.appendChapter(
+      book,
+      first,
+      title: '第二',
+    );
     await h.app.chapterStore.writeText(book.id, first.id, second.id, '乙');
-    await h.app.library.relocateChapter(book, second.id, first.id, 0);
-    final numbered = await h.app.library.appendVolume(book);
-    await h.app.library.renameVolume(book, numbered, '');
-    final emptyTitle = await h.app.library.appendChapter(book, numbered);
-    await h.app.library.renameChapter(book, emptyTitle, '');
+    await h.app.library.structure.relocateChapter(book, second.id, first.id, 0);
+    final numbered = await h.app.library.structure.appendVolume(book);
+    await h.app.library.structure.renameVolume(book, numbered, '');
+    final emptyTitle = await h.app.library.structure.appendChapter(
+      book,
+      numbered,
+    );
+    await h.app.library.structure.renameChapter(book, emptyTitle, '');
     await h.app.chapterStore.writeText(
       book.id,
       numbered.id,
       emptyTitle.id,
       '丙',
     );
-    await h.app.library.setNumbering(
+    await h.app.library.structure.setNumbering(
       book,
       numbered,
       const ChapterNumbering(
@@ -201,8 +208,8 @@ void main() {
         padding: 3,
       ),
     );
-    await h.app.library.reorderVolume(book, numbered.id, 0);
-    await h.app.library.appendVolume(book, title: '空卷');
+    await h.app.library.structure.reorderVolume(book, numbered.id, 0);
+    await h.app.library.structure.appendVolume(book, title: '空卷');
     final index = await h.app.paths.bookFile(book.id).readAsBytes();
     final file = (await h.app.exporter.export(
       ExportTarget.volume(book.id, first.id),
@@ -227,7 +234,7 @@ void main() {
     addTearDown(h.dispose);
     final (book, volume, chapter) = await _open(h);
     expect(await h.app.editor.close(), isTrue);
-    await h.app.library.deleteChapter(book, volume, chapter);
+    await h.app.library.structure.deleteChapter(book, volume, chapter);
     expect(
       await h.app.exporter.export(ExportTarget.volume(book.id, volume.id)),
       isNull,
@@ -235,7 +242,7 @@ void main() {
     expect(h.app.exporter.message, '暂无章节可导出');
     expect(await h.app.exporter.export(ExportTarget.book(book.id)), isNull);
     expect(await Directory('${h.root.path}/exports').exists(), isFalse);
-    final empty = await h.app.library.appendChapter(book, volume);
+    final empty = await h.app.library.structure.appendChapter(book, volume);
     final file = (await h.app.exporter.export(
       ExportTarget.chapter(book.id, volume.id, empty.id),
     ))!;
@@ -262,7 +269,7 @@ void main() {
     );
     addTearDown(h.dispose);
     final (book, volume, _) = await _open(h);
-    await h.app.library.appendChapter(book, volume);
+    await h.app.library.structure.appendChapter(book, volume);
     final pending = h.app.exporter
         .export(ExportTarget.book(book.id))
         .then<Object?>((file) => file, onError: (Object error) => error);
@@ -335,7 +342,6 @@ void main() {
     'create',
     'open',
     'details',
-    'save',
     'deleteBook',
     'appendChapter',
     'appendVolume',
@@ -348,8 +354,6 @@ void main() {
     'renameChapter',
     'renameBook',
     'remember',
-    'moveChapter',
-    'moveVolume',
     'reload',
     'detailsRead',
     'expanded',
@@ -368,8 +372,8 @@ void main() {
       );
       addTearDown(h.dispose);
       final (book, volume, chapter) = await _open(h);
-      final other = await h.app.library.appendVolume(book);
-      final second = await h.app.library.appendChapter(book, volume);
+      final other = await h.app.library.structure.appendVolume(book);
+      final second = await h.app.library.structure.appendChapter(book, volume);
       final library = h.app.library;
       final summary = library.books.single;
       final index = await h.app.paths.bookFile(book.id).readAsBytes();
@@ -381,30 +385,30 @@ void main() {
           await library.openBook(summary);
         },
         'details': () => library.updateBookDetails(book, '不准改名', '不准备注'),
-        'save': () => library.saveBook(book),
         'deleteBook': () => library.deleteBook(summary),
         'appendChapter': () async {
-          await library.appendChapter(book, volume);
+          await library.structure.appendChapter(book, volume);
         },
         'appendVolume': () async {
-          await library.appendVolume(book);
+          await library.structure.appendVolume(book);
         },
-        'numbering': () => library.setNumbering(
+        'numbering': () => library.structure.setNumbering(
           book,
           volume,
           const ChapterNumbering(enabled: true),
         ),
         'relocate': () =>
-            library.relocateChapter(book, chapter.id, other.id, 0),
-        'reorder': () => library.reorderVolume(book, other.id, 0),
-        'deleteChapter': () => library.deleteChapter(book, volume, second),
-        'deleteVolume': () => library.deleteVolume(book, other),
-        'renameVolume': () => library.renameVolume(book, volume, '不准改卷'),
-        'renameChapter': () => library.renameChapter(book, second, '不准改章'),
+            library.structure.relocateChapter(book, chapter.id, other.id, 0),
+        'reorder': () => library.structure.reorderVolume(book, other.id, 0),
+        'deleteChapter': () =>
+            library.structure.deleteChapter(book, volume, second),
+        'deleteVolume': () => library.structure.deleteVolume(book, other),
+        'renameVolume': () =>
+            library.structure.renameVolume(book, volume, '不准改卷'),
+        'renameChapter': () =>
+            library.structure.renameChapter(book, second, '不准改章'),
         'renameBook': () => library.renameBook(summary, '不准改书'),
         'remember': () => library.rememberChapter(book.id, second.id),
-        'moveChapter': () => library.moveChapter(book, volume, chapter, 1),
-        'moveVolume': () => library.moveVolume(book, other, -1),
         'reload': () => library.load(),
         'detailsRead': () async {
           await library.readBookDetails(summary);
@@ -442,7 +446,11 @@ void main() {
     addTearDown(h.dispose);
     final (book, volume, _) = await _open(h);
     writer.holdIndex = true;
-    final mutation = h.app.library.renameVolume(book, volume, '提交后的卷');
+    final mutation = h.app.library.structure.renameVolume(
+      book,
+      volume,
+      '提交后的卷',
+    );
     await writer.entered.future;
     final pending = _exportCurrent(h);
     try {

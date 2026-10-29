@@ -60,8 +60,8 @@ void main() {
     final book = await h.app.library.openBook(summary);
     expect(book.volumes.first.title, '未命名卷');
     expect(book.allChapters.first.title, '未命名章节');
-    final volume = await h.app.library.appendVolume(book);
-    final chapter = await h.app.library.appendChapter(book, volume);
+    final volume = await h.app.library.structure.appendVolume(book);
+    final chapter = await h.app.library.structure.appendChapter(book, volume);
     expect(volume.title, '未命名卷');
     expect(chapter.title, '未命名章节');
   });
@@ -97,8 +97,8 @@ void main() {
     final book = await h.app.library.openBook(summary);
     final volume = book.volumes.first;
     final chapter = volume.chapters.first;
-    await h.app.library.renameVolume(book, volume, '   ');
-    await h.app.library.renameChapter(book, chapter, '');
+    await h.app.library.structure.renameVolume(book, volume, '   ');
+    await h.app.library.structure.renameChapter(book, chapter, '');
     final saved = await h.app.bookStore.load(summary);
     expect(volume.title, '');
     expect(chapter.title, '');
