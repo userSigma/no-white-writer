@@ -4,7 +4,7 @@ import 'dart:ui' show AppExitResponse;
 import 'package:fluent_ui/fluent_ui.dart';
 
 import 'app_context.dart';
-import 'core/chapter_numbering.dart';
+import 'core/chapter_display.dart';
 import 'core/i18n/i18n.dart';
 import 'core/models.dart';
 import 'core/logging/app_logger.dart';
@@ -136,7 +136,7 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
     AppLogger.instance.info('app.exit.requested');
     if (app.exporter.busy ||
         app.editor.isComposing ||
-        !await app.flushUiGuards()) {
+        !await app.uiGuards.flush()) {
       AppLogger.instance.warn('app.exit.cancelled.busy-or-draft');
       if (mounted) {
         setState(
@@ -276,7 +276,19 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
           ),
         );
       },
-      home: widget.home ?? ShelfPage(app: app),
+      home:
+          widget.home ??
+          ShelfPage(
+            library: app.library,
+            editor: app.editor,
+            exporter: app.exporter,
+            settings: app.settings,
+            i18n: app.i18n,
+            platform: app.platform,
+            paths: app.paths,
+            uiGuards: app.uiGuards,
+            recoveredChapterCount: app.recoveredChapterCount,
+          ),
     );
   }
 }

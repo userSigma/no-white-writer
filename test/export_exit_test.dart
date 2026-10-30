@@ -283,7 +283,7 @@ void main() {
   testWidgets('退出先询问 UI 草稿守卫，拒绝后不强行保存或销毁输入', (tester) async {
     final h = await widgetHarness(tester);
     var called = 0;
-    final token = h.app.registerUiGuard(() async {
+    final token = h.app.uiGuards.register(() async {
       called++;
       return false;
     });
@@ -295,7 +295,7 @@ void main() {
     await finishIo(tester, until: () => response != null);
     expect(called, 1);
     expect(response, AppExitResponse.cancel);
-    h.app.removeUiGuard(token);
+    h.app.uiGuards.remove(token);
     response = null;
     tester.binding.handleRequestAppExit().then((value) => response = value);
     await finishIo(tester, until: () => response != null);
