@@ -7,10 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/app.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
-import 'package:no_white_writer/ui/shelf_page.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/app_harness.dart';
 import 'support/widget_harness.dart';
 
@@ -103,13 +102,13 @@ void main() {
     for (final editor in [false, true]) {
       testWidgets('真实设置入口打开设置浮窗而非页面 $width editor=$editor', (tester) async {
         final h = await widgetHarness(tester, width: width);
-        Widget home = ShelfPage(app: h.app);
+        Widget home = shelfPage(app: h.app);
         if (editor) {
           final book = (await tester.runAsync(() async {
             final summary = await h.app.library.createBook('设置入口');
             return h.app.library.openBook(summary);
           }))!;
-          home = EditorPage(app: h.app, book: book);
+          home = editorPage(app: h.app, book: book);
         }
         await tester.pumpWidget(FluentApp(home: home));
         if (editor) {
@@ -130,7 +129,7 @@ void main() {
   testWidgets('验收入口自动弹出同一设置浮窗，不出现旧设置页面', (tester) async {
     final h = await widgetHarness(tester);
     await tester.pumpWidget(
-      FluentApp(home: ShelfPage(app: h.app, autoOpenSettings: true)),
+      FluentApp(home: shelfPage(app: h.app, autoOpenSettings: true)),
     );
     await finishIo(
       tester,
@@ -144,7 +143,7 @@ void main() {
 
   testWidgets('设置浮窗改主题、字号、行距、缩进与空行，关闭后落盘并可重开读取', (tester) async {
     final h = await widgetHarness(tester);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await _openSettings(tester);
 
     await tester.tap(find.byKey(const ValueKey('settings-theme')));
@@ -192,7 +191,7 @@ void main() {
 
   testWidgets('ComboBox 弹层按 Esc 先关闭弹层，再按 Esc 才关闭设置浮窗', (tester) async {
     final h = await widgetHarness(tester);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await _openSettings(tester);
     await tester.tap(find.byKey(const ValueKey('settings-theme')));
     await finishIo(tester);
@@ -235,7 +234,7 @@ void main() {
 
   testWidgets('导出目录草稿未保存时关闭浮窗需要确认，继续编辑保留草稿，丢弃后才关闭', (tester) async {
     final h = await widgetHarness(tester);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await _openSettings(tester);
     final box = find.byKey(const ValueKey('settings-export-path'));
     await tester.enterText(box, 'D:/草稿目录');
@@ -261,7 +260,7 @@ void main() {
   testWidgets('设置保存失败时浮窗保留草稿并显示重试，重试成功后清除错误', (tester) async {
     final writer = _SettingsWriter();
     final h = await widgetHarness(tester, writer: writer);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await _openSettings(tester);
     await tester.enterText(
       find.byKey(const ValueKey('settings-export-path')),
@@ -304,7 +303,7 @@ void main() {
   testWidgets('导出目录输入法组词中不能保存或关闭浮窗，组词结束后恢复', (tester) async {
     final writer = _SettingsWriter();
     final h = await widgetHarness(tester, writer: writer);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await _openSettings(tester);
     final box = find.byKey(const ValueKey('settings-export-path'));
     await tester.tap(box);
@@ -341,7 +340,7 @@ void main() {
   testWidgets('目录真实组词时点击外部不得清除 composing 或弹出丢弃确认', (tester) async {
     final writer = _SettingsWriter();
     final h = await widgetHarness(tester, writer: writer);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await _openSettings(tester);
     final field = find.byKey(const ValueKey('settings-export-path'));
     await tester.tap(field);
@@ -378,7 +377,7 @@ void main() {
     }))!;
     await tester.pumpWidget(
       FluentApp(
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));

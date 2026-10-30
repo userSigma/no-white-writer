@@ -8,9 +8,9 @@ import 'package:no_white_writer/app.dart';
 import 'package:no_white_writer/core/chapter_numbering.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/app_harness.dart';
 import 'support/fake_platform.dart';
 import 'support/widget_harness.dart';
@@ -111,7 +111,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));

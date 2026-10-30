@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../core/chapter_numbering.dart';
+import '../core/chapter_display.dart';
 import '../core/models.dart';
 import '../core/storage/export_service.dart';
 import '../core/storage/export_snapshot_store.dart';

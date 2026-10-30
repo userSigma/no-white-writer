@@ -5,11 +5,17 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart'
     show InputDecoration, Material, MaterialType, TextField;
 
-import '../app_context.dart';
-import '../core/chapter_numbering.dart';
+import '../core/chapter_display.dart';
+import '../core/i18n/i18n.dart';
 import '../core/models.dart';
+import '../core/platform/platform_services.dart';
+import '../core/storage/app_paths.dart';
 import '../core/text/word_count.dart';
 import '../state/editor_controller.dart';
+import '../state/export_controller.dart';
+import '../state/library_controller.dart';
+import '../state/settings_controller.dart';
+import '../state/ui_operation_guards.dart';
 import '../state/workspace_controller.dart';
 import 'chapter_pane.dart';
 import 'format.dart';
@@ -22,12 +28,29 @@ import 'theme/tokens.dart';
 class EditorPage extends StatefulWidget {
   const EditorPage({
     super.key,
-    required this.app,
+    required this.library,
+    required this.editor,
+    required this.exporter,
+    required this.settings,
+    required this.i18n,
+    required this.platform,
+    required this.paths,
+    required this.uiGuards,
     required this.book,
+    this.recoveredChapterCount = 0,
     this.volume,
     this.chapter,
   });
-  final AppContext app;
+  final LibraryController library;
+  final EditorController editor;
+  final ExportController exporter;
+  final SettingsController settings;
+  final I18nController i18n;
+  final PlatformServices platform;
+  final AppPaths paths;
+  final UiOperationGuards uiGuards;
+  // 根路由进入编辑器时，回书架仍保留启动恢复提示；无需暴露恢复记录本身。
+  final int recoveredChapterCount;
   final BookIndex book;
   final Volume? volume;
   final ChapterMeta? chapter;
@@ -48,27 +71,27 @@ class _EditorPageState extends State<EditorPage> {
   bool _paneOpen = false;
   bool _paneClosing = false;
   bool _pendingTitleFocus = false;
-  EditorController get editor => widget.app.editor;
+  EditorController get editor => widget.editor;
 
   @override
   void initState() {
     super.initState();
-    _expanded = widget.app.library.expandedVolumesOf(widget.book);
+    _expanded = widget.library.expandedVolumesOf(widget.book);
     workspace = WorkspaceController(
       book: widget.book,
-      library: widget.app.library,
+      library: widget.library,
       editor: editor,
-      exportBusy: () => widget.app.exporter.busy,
+      exportBusy: () => widget.exporter.busy,
     );
-    _uiGuard = widget.app.registerUiGuard(() async {
+    _uiGuard = widget.uiGuards.register(() async {
       if (workspace.editingLocked || editor.isComposing) return false;
       return _paneDraft.flush();
     });
-    widget.app.exporter.addListener(_onChanged);
+    widget.exporter.addListener(_onChanged);
     _paneDraft.addListener(_onChanged);
     workspace.addListener(_onChanged);
     editor.addListener(_onChanged);
-    widget.app.settings.addListener(_onChanged);
+    widget.settings.addListener(_onChanged);
     _bodyFocus.addListener(_bodyFocusChanged);
     _titleFocus.addListener(_titleFocusChanged);
     workspace.initialize(preferredChapter: widget.chapter);
@@ -96,20 +119,20 @@ class _EditorPageState extends State<EditorPage> {
   void _onChanged() {
     _expanded
       ..clear()
-      ..addAll(widget.app.library.expandedVolumesOf(widget.book));
+      ..addAll(widget.library.expandedVolumesOf(widget.book));
     if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _disposing = true;
-    widget.app.removeUiGuard(_uiGuard);
-    widget.app.exporter.removeListener(_onChanged);
+    widget.uiGuards.remove(_uiGuard);
+    widget.exporter.removeListener(_onChanged);
     _paneDraft.removeListener(_onChanged);
     _paneDraft.dispose();
     workspace.removeListener(_onChanged);
     editor.removeListener(_onChanged);
-    widget.app.settings.removeListener(_onChanged);
+    widget.settings.removeListener(_onChanged);
     _bodyFocus.removeListener(_bodyFocusChanged);
     _titleFocus.removeListener(_titleFocusChanged);
     _bodyFocus.dispose();
@@ -143,8 +166,17 @@ class _EditorPageState extends State<EditorPage> {
       } else {
         navigator.pushReplacement<void, void>(
           PageRouteBuilder<void>(
-            pageBuilder: (BuildContext context, _, _) =>
-                ShelfPage(app: widget.app),
+            pageBuilder: (BuildContext context, _, _) => ShelfPage(
+              library: widget.library,
+              editor: widget.editor,
+              exporter: widget.exporter,
+              settings: widget.settings,
+              i18n: widget.i18n,
+              platform: widget.platform,
+              paths: widget.paths,
+              uiGuards: widget.uiGuards,
+              recoveredChapterCount: widget.recoveredChapterCount,
+            ),
           ),
         );
       }
@@ -177,9 +209,9 @@ class _EditorPageState extends State<EditorPage> {
     if (_carrierBlocked) return;
     _paneClosing = true;
     try {
-      final collapsed = widget.app.settings.settings.sidebarCollapsed;
+      final collapsed = widget.settings.settings.sidebarCollapsed;
       if (!collapsed && !await _paneDraft.flush()) return;
-      if (mounted) widget.app.settings.setSidebarCollapsed(!collapsed);
+      if (mounted) widget.settings.setSidebarCollapsed(!collapsed);
     } finally {
       _paneClosing = false;
     }
@@ -231,7 +263,7 @@ class _EditorPageState extends State<EditorPage> {
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           final bool wide = constraints.maxWidth >= 1000;
-          final bool collapsed = widget.app.settings.settings.sidebarCollapsed;
+          final bool collapsed = widget.settings.settings.sidebarCollapsed;
           return Container(
             color: paperOrInk(context),
             child: Column(
@@ -266,7 +298,13 @@ class _EditorPageState extends State<EditorPage> {
             ),
             const Spacer(),
             SettingsMenuButton(
-              app: widget.app,
+              editor: widget.editor,
+              exporter: widget.exporter,
+              settings: widget.settings,
+              i18n: widget.i18n,
+              platform: widget.platform,
+              paths: widget.paths,
+              uiGuards: widget.uiGuards,
               enabled: !blocked,
               beforeOpen: () async => _paneDraft.flush(),
             ),
@@ -371,11 +409,9 @@ class _EditorPageState extends State<EditorPage> {
                                       expanded: _expanded,
                                       onCreated: _created,
                                       draft: _paneDraft,
-                                      exporter: widget.app.exporter,
-                                      revealPath: widget
-                                          .app
-                                          .platform
-                                          .revealInFileManager,
+                                      exporter: widget.exporter,
+                                      revealPath:
+                                          widget.platform.revealInFileManager,
                                     ),
                                   ),
                                   Container(
@@ -414,7 +450,7 @@ class _EditorPageState extends State<EditorPage> {
         children: <Widget>[
           if (wide)
             Tooltip(
-              message: widget.app.settings.settings.sidebarCollapsed
+              message: widget.settings.settings.sidebarCollapsed
                   ? '展开目录侧栏'
                   : '收起目录侧栏',
               child: IconButton(
@@ -588,10 +624,8 @@ class _EditorPageState extends State<EditorPage> {
                                 scrollPadding: const EdgeInsets.all(24),
                                 style: TextStyle(
                                   fontFamily: 'LXGWWenKaiGB',
-                                  fontSize:
-                                      widget.app.settings.settings.fontSize,
-                                  height:
-                                      widget.app.settings.settings.lineHeight,
+                                  fontSize: widget.settings.settings.fontSize,
+                                  height: widget.settings.settings.lineHeight,
                                   color: bodyTextColor(context),
                                   letterSpacing: 0.2,
                                 ),
@@ -602,10 +636,8 @@ class _EditorPageState extends State<EditorPage> {
                                   hintStyle: TextStyle(
                                     color: bodyTextColor(context),
                                     fontFamily: 'LXGWWenKaiGB',
-                                    fontSize:
-                                        widget.app.settings.settings.fontSize,
-                                    height:
-                                        widget.app.settings.settings.lineHeight,
+                                    fontSize: widget.settings.settings.fontSize,
+                                    height: widget.settings.settings.lineHeight,
                                   ),
                                 ),
                               ),

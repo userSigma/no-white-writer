@@ -13,9 +13,11 @@ import 'core/storage/atomic_file_writer.dart';
 import 'core/storage/book_store.dart';
 import 'core/storage/chapter_store.dart';
 import 'core/storage/export_service.dart';
+import 'core/storage/export_snapshot_store.dart';
 import 'core/storage/instance_lock.dart';
 import 'core/storage/library_store.dart';
 import 'state/editor_controller.dart';
+import 'state/export_controller.dart';
 import 'state/library_controller.dart';
 import 'state/settings_controller.dart';
 import 'ui/editor_page.dart';
@@ -150,6 +152,14 @@ Future<void> main() async {
     await libraryStore.save(index);
   }
 
+  final ExportController exporter = ExportController(
+    reader: ExportSnapshotStore(paths),
+    editor: editor,
+    library: library,
+    settings: settingsController,
+    service: exports,
+  );
+
   final AppContext context = AppContext(
     platform: platform,
     paths: paths,
@@ -163,7 +173,8 @@ Future<void> main() async {
     editor: editor,
     i18n: i18n,
     instanceLock: lock,
-    recovered: restored,
+    recoveredChapterCount: restored.length,
+    exporter: exporter,
   );
 
   await library.load();
@@ -173,14 +184,36 @@ Future<void> main() async {
   Widget? devHome;
   final String devPage = Platform.environment['NWW_DEV_PAGE'] ?? '';
   if (devPage == 'settings') {
-    devHome = ShelfPage(app: context, autoOpenSettings: true);
+    devHome = ShelfPage(
+      library: context.library,
+      editor: context.editor,
+      exporter: context.exporter,
+      settings: context.settings,
+      i18n: context.i18n,
+      platform: context.platform,
+      paths: context.paths,
+      uiGuards: context.uiGuards,
+      recoveredChapterCount: context.recoveredChapterCount,
+      autoOpenSettings: true,
+    );
   } else if (devPage.isNotEmpty) {
     final List<BookSummary> books = library.books;
     if (books.isNotEmpty) {
       final BookIndex book = await library.openBook(books.first);
       if (devPage == 'editor' || devPage == 'catalog') {
         // catalog 旧验收入口也映射到统一工作区；空作品同样可以打开。
-        devHome = EditorPage(app: context, book: book);
+        devHome = EditorPage(
+          library: context.library,
+          editor: context.editor,
+          exporter: context.exporter,
+          settings: context.settings,
+          i18n: context.i18n,
+          platform: context.platform,
+          paths: context.paths,
+          uiGuards: context.uiGuards,
+          recoveredChapterCount: context.recoveredChapterCount,
+          book: book,
+        );
         final String devType = Platform.environment['NWW_DEV_TYPE'] ?? '';
         if (devType.isNotEmpty) {
           void prefill() {

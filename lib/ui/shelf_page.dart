@@ -10,10 +10,15 @@ import 'package:flutter/rendering.dart'
         axisDirectionIsReversed;
 import 'package:flutter/services.dart';
 
-import '../app_context.dart';
+import '../core/i18n/i18n.dart';
 import '../core/models.dart';
+import '../core/platform/platform_services.dart';
+import '../core/storage/app_paths.dart';
+import '../state/editor_controller.dart';
 import '../state/export_controller.dart';
 import '../state/library_controller.dart';
+import '../state/settings_controller.dart';
+import '../state/ui_operation_guards.dart';
 import 'book_details_dialog.dart';
 import 'context_menu.dart';
 import 'editor_page.dart';
@@ -25,13 +30,29 @@ import 'theme/tokens.dart';
 class ShelfPage extends StatefulWidget {
   const ShelfPage({
     super.key,
-    required this.app,
+    required this.library,
+    required this.editor,
+    required this.exporter,
+    required this.settings,
+    required this.i18n,
+    required this.platform,
+    required this.paths,
+    required this.uiGuards,
     this.autoOpenSettings = false,
+    this.recoveredChapterCount = 0,
   });
-  final AppContext app;
+  final LibraryController library;
+  final EditorController editor;
+  final ExportController exporter;
+  final SettingsController settings;
+  final I18nController i18n;
+  final PlatformServices platform;
+  final AppPaths paths;
+  final UiOperationGuards uiGuards;
 
   /// Dev entry point: show the real settings menu on first frame.
   final bool autoOpenSettings;
+  final int recoveredChapterCount;
   @override
   State<ShelfPage> createState() => _ShelfPageState();
 }
@@ -45,18 +66,18 @@ class _ShelfPageState extends State<ShelfPage> {
   @override
   void initState() {
     super.initState();
-    widget.app.library.addListener(_changed);
-    widget.app.exporter.addListener(_changed);
-    widget.app.library.ensureLoaded();
+    widget.library.addListener(_changed);
+    widget.exporter.addListener(_changed);
+    widget.library.ensureLoaded();
     if (widget.autoOpenSettings) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_settingsKey.currentState?.open());
       });
     }
-    if (widget.app.recovered.isNotEmpty) {
+    if (widget.recoveredChapterCount > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _notice('上次异常退出', '已恢复 ${widget.app.recovered.length} 个章节。');
+          _notice('上次异常退出', '已恢复 ${widget.recoveredChapterCount} 个章节。');
         }
       });
     }
@@ -64,8 +85,8 @@ class _ShelfPageState extends State<ShelfPage> {
 
   @override
   void dispose() {
-    widget.app.library.removeListener(_changed);
-    widget.app.exporter.removeListener(_changed);
+    widget.library.removeListener(_changed);
+    widget.exporter.removeListener(_changed);
     _focus.dispose();
     super.dispose();
   }
@@ -75,7 +96,7 @@ class _ShelfPageState extends State<ShelfPage> {
       setState(() {
         _selected = _selected.clamp(
           0,
-          math.max(0, widget.app.library.books.length - 1),
+          math.max(0, widget.library.books.length - 1),
         );
       });
     }
@@ -91,15 +112,25 @@ class _ShelfPageState extends State<ShelfPage> {
     ),
   );
   Future<void> _openBook(BookSummary summary) async {
-    if (_opening || _managing || widget.app.exporter.busy) return;
+    if (_opening || _managing || widget.exporter.busy) return;
     _opening = true;
     try {
-      final book = await widget.app.library.openBook(summary);
+      final book = await widget.library.openBook(summary);
       if (!mounted) return;
       await Navigator.of(context).push<void>(
         PageRouteBuilder(
-          pageBuilder: (context, _, _) =>
-              EditorPage(app: widget.app, book: book),
+          pageBuilder: (context, _, _) => EditorPage(
+            library: widget.library,
+            editor: widget.editor,
+            exporter: widget.exporter,
+            settings: widget.settings,
+            i18n: widget.i18n,
+            platform: widget.platform,
+            paths: widget.paths,
+            uiGuards: widget.uiGuards,
+            recoveredChapterCount: widget.recoveredChapterCount,
+            book: book,
+          ),
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
         ),
@@ -113,7 +144,7 @@ class _ShelfPageState extends State<ShelfPage> {
   }
 
   Future<void> _createBook() async {
-    if (_creating || _opening || _managing || widget.app.exporter.busy) return;
+    if (_creating || _opening || _managing || widget.exporter.busy) return;
     _creating = true;
     try {
       final created = await showDialog<BookSummary>(
@@ -121,7 +152,7 @@ class _ShelfPageState extends State<ShelfPage> {
         builder: (context) => BookDetailsDialog<BookSummary>(
           creating: true,
           onSave: (title, notes) =>
-              widget.app.library.createBook(title, notes: notes),
+              widget.library.createBook(title, notes: notes),
         ),
       );
       if (created != null && mounted) await _openBook(created);
@@ -131,11 +162,11 @@ class _ShelfPageState extends State<ShelfPage> {
   }
 
   Future<void> _editBook(BookSummary summary) async {
-    if (_managing || _opening || _creating || widget.app.exporter.busy) return;
+    if (_managing || _opening || _creating || widget.exporter.busy) return;
     _managing = true;
     try {
       // 不触碰 editor 或上一本书的绑定，始终使用稳定 ID 对应的独立索引。
-      final book = await widget.app.library.readBookDetails(summary);
+      final book = await widget.library.readBookDetails(summary);
       if (!mounted) return;
       await showDialog<bool>(
         context: context,
@@ -143,7 +174,7 @@ class _ShelfPageState extends State<ShelfPage> {
           initialTitle: book.title,
           initialNotes: book.notes,
           onSave: (title, notes) async {
-            await widget.app.library.updateBookDetails(book, title, notes);
+            await widget.library.updateBookDetails(book, title, notes);
             return true;
           },
         ),
@@ -156,7 +187,7 @@ class _ShelfPageState extends State<ShelfPage> {
   }
 
   Future<void> _deleteBook(BookSummary summary) async {
-    if (_managing || _opening || _creating || widget.app.exporter.busy) return;
+    if (_managing || _opening || _creating || widget.exporter.busy) return;
     _managing = true;
     try {
       final ok = await showDialog<bool>(
@@ -176,7 +207,7 @@ class _ShelfPageState extends State<ShelfPage> {
           ],
         ),
       );
-      if (ok == true) await widget.app.library.deleteBook(summary);
+      if (ok == true) await widget.library.deleteBook(summary);
     } catch (error) {
       if (mounted) _notice('删除失败，作品已保留', '$error');
     } finally {
@@ -185,7 +216,7 @@ class _ShelfPageState extends State<ShelfPage> {
   }
 
   Future<void> _exportBook(String bookId) async {
-    final exporter = widget.app.exporter;
+    final exporter = widget.exporter;
     if (exporter.busy) {
       _notice('正在导出', '请等当前导出完成后再试。');
       return;
@@ -208,7 +239,7 @@ class _ShelfPageState extends State<ShelfPage> {
         message: '已导出为纯文本文件。',
         filePath: file.path,
         openDirectory: (_) async {
-          if (!await widget.app.platform.revealInFileManager(dir)) {
+          if (!await widget.platform.revealInFileManager(dir)) {
             throw StateError('系统没有打开该文件夹');
           }
         },
@@ -227,7 +258,7 @@ class _ShelfPageState extends State<ShelfPage> {
   }
 
   Future<void> _menu(BookSummary summary, Offset position) async {
-    if (_opening || _creating || _managing || widget.app.exporter.busy) return;
+    if (_opening || _creating || _managing || widget.exporter.busy) return;
     final bookId = summary.id;
     final action = await showContextMenu(context, position, const [
       MenuAction('open', '打开'),
@@ -249,7 +280,7 @@ class _ShelfPageState extends State<ShelfPage> {
   }
 
   KeyEventResult _key(FocusNode node, KeyEvent event) {
-    final books = widget.app.library.books;
+    final books = widget.library.books;
     if (books.isEmpty || (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
       return KeyEventResult.ignored;
     }
@@ -282,7 +313,7 @@ class _ShelfPageState extends State<ShelfPage> {
 
   @override
   Widget build(BuildContext context) {
-    final library = widget.app.library;
+    final library = widget.library;
     return Container(
       color: paperOrInk(context),
       child: Focus(
@@ -339,8 +370,14 @@ class _ShelfPageState extends State<ShelfPage> {
                   const SizedBox(width: 8),
                   SettingsMenuButton(
                     key: _settingsKey,
-                    app: widget.app,
-                    enabled: !widget.app.exporter.busy,
+                    editor: widget.editor,
+                    exporter: widget.exporter,
+                    settings: widget.settings,
+                    i18n: widget.i18n,
+                    platform: widget.platform,
+                    paths: widget.paths,
+                    uiGuards: widget.uiGuards,
+                    enabled: !widget.exporter.busy,
                     beforeOpen: () async {
                       _focus.requestFocus();
                       return true;
@@ -348,7 +385,7 @@ class _ShelfPageState extends State<ShelfPage> {
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
-                    onPressed: widget.app.exporter.busy ? null : _createBook,
+                    onPressed: widget.exporter.busy ? null : _createBook,
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -385,7 +422,7 @@ class _ShelfPageState extends State<ShelfPage> {
                           const Text('新建一本，开始写第一段。'),
                           const SizedBox(height: 18),
                           FilledButton(
-                            onPressed: widget.app.exporter.busy
+                            onPressed: widget.exporter.busy
                                 ? null
                                 : _createBook,
                             child: const Text('新建作品'),

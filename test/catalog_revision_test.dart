@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' show TextField;
 import 'package:no_white_writer/core/models.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
 
 void main() {
@@ -19,7 +19,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -59,7 +59,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -107,7 +107,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -153,7 +153,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
