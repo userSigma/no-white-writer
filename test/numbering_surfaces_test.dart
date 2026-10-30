@@ -3,8 +3,8 @@ import 'package:no_white_writer/app.dart';
 import 'package:no_white_writer/core/chapter_numbering.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/state/export_controller.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
 
+import 'support/page_harness.dart';
 import 'support/app_harness.dart';
 import 'support/fake_platform.dart';
 import 'support/widget_harness.dart';
@@ -92,7 +92,7 @@ void main() {
     await tester.pumpWidget(
       NoWhiteWriterApp(
         app: h.app,
-        home: EditorPage(app: h.app, book: b),
+        home: editorPage(app: h.app, book: b),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -121,7 +121,7 @@ void main() {
     await tester.pumpWidget(
       NoWhiteWriterApp(
         app: h.app,
-        home: EditorPage(
+        home: editorPage(
           app: h.app,
           book: b,
           volume: secondVolume,

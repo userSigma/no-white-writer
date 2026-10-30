@@ -240,3 +240,54 @@ SHA-256：`148E4281F9DD44BC9491B6B0D830F90C50A3B1BF45FC8617B96E8FD2A48625AB`。
 - 移动前一次 `Ctrl+ArrowDown` 未产生可见移动，随后改用真实拖放完成验收；不把该次尝试记为原生组合键通过，也不据此断言业务回归。键盘移动仍由既有组件回归覆盖。
 - 原生输入采用英文文本粘贴，不等于微软／搜狗中文候选窗、中文长句、撤销重做或完整 IME 人工验收；未覆盖多屏、150%／200% DPI、系统文字缩放及完整无障碍读屏矩阵。本轮只闭环 P1 指定主流程，未扩展生产代码或 P2 范围。
 
+## 12. P2 第二阶段整理与普通启动验证（2026-10-29）
+
+### 自动化与范围
+
+- 实施范围为[重构清单 §5](<重构清单.md#5-p2第二阶段整理2026-10-29-完成>)：设置浮窗组件拆分、页面显式依赖、导出控制器组合根装配、纯编号值对象／显示投影解耦。未使用子代理；未修改磁盘格式、存储恢复、编号算法、导出格式或状态管理框架。
+- [格式检查](<../.devdata/p2-final-format.log>)：**103 文件、0 changed**；[静态分析](<../.devdata/p2-final-analyze.log>)：**No issues found**；[全量测试](<../.devdata/p2-final-full-test.log>)：**341 项全部通过**，含 324 项原有测试与 17 项 P2 新增回归。
+- [Windows x64 release 构建](<../.devdata/p2-final-windows-build.log>)：**61.1 s，exit 0**。验证完成后仅回写文档，未继续改动生产或测试代码。
+
+### 可用发布包与普通启动
+
+- 使用现有[普通启动验证脚本](<../tool/verify_normal_startup.ps1>)打包、解压和核对；[完整 ZIP](<../build/packages/no-white-writer-0.4.1-5-windows-x64-20261029-171539.zip>)的 SHA-256 为 `4E7CD260FC0F0BCDA613BBC8FEB0BBAAAB868266B3C7FBBE2B69535156F8EEA3`，未覆盖旧包。
+- [普通目录启动入口](<C:/Users/userSigma/Downloads/no-white-writer-0.4.1-5-windows-x64-20261029-171539/no_white_writer.exe>)：保留同目录 DLL 和 data；不以仍受 §6／§10 安全标签影响的构建目录 exe 作为日常入口。解压包 **21 个文件**在启动前后与构建源逐一 SHA-256 相符，exe 无 Low 完整性标签。
+- 清除 `NWW_DATA_ROOT`、`NWW_DEV_PAGE`、`NWW_DEV_TYPE`，使用默认 AppData。自有 PID **40448** 显示标题「不白写作」、窗口句柄 **2821678**；正常关窗，退出码 **0**。原有 **8 份作品文件**启动前后 SHA-256 不变。stderr 仅 Impeller 后端说明，无 Dart 异常；启动前六个既有无窗口进程未处理。
+- [普通启动日志](<../.devdata/p2-normal-startup.log>)、[本次源文件清单](<../.devdata/verify-normal-startup-20261029-171539/source-manifest.json>)、[启动前作品清单](<../.devdata/verify-normal-startup-20261029-171539/books-before.json>)与[最近成功启动记录](<../.devdata/verify-normal-startup-latest.json>)保留本地证据。
+
+### 验收边界
+
+- 本轮新鲜原生验证为普通启动、正常关窗及原作品字节不变；不把 P1 的交互记录记作 P2 重新执行。自定义主题、设置目录、失败留稿、真实输入客户端组词及草稿关闭守卫由组件回归验证，完整中文候选窗、多屏、DPI／文字缩放与无障碍人工矩阵仍待体验。
+
+## 13. P2 浅包装清理与主题原生复验（2026-10-29）
+
+### 自动化与构建边界
+
+- 删除设置入口的 `open()` 私有转发和 `_row()` 共享组件浅包装，新增架构边界断言；定向主题及设置测试 **22 项**、完整套件 **343 项**全部通过，`flutter analyze --no-pub` 无问题。
+- 原目录执行 `flutter build windows --release --no-pub` 因既有实例占用目标 exe 而失败：`LNK1104: 无法打开文件 ...\build\windows\x64\runner\Release\no_white_writer.exe`。未关闭或替换原有 **6 个**进程，不将这次失败记为原目录构建成功。
+- 改用工作区隔离源码副本 `.devdata/p2-theme-native-src`（排除 `.git`、`build`、`.devdata`），执行依赖恢复、插件链接修复及 Windows x64 release 构建，最终成功。该副本仅用于构建和验收，不记为额外产品源码修改。
+
+### 真实 Windows 界面结果
+
+- 以 `NWW_DATA_ROOT=C:/Users/userSigma/no-white-writer/.devdata/p2-theme-native-acceptance-20261029-1902/data`、`NWW_DEV_PAGE=settings` 启动本轮实例 PID **9196**；仅操作该实例，未读取或修改默认 AppData 作品。
+- **创建：** 新建主题「原生纸墨」，设置背景 `F7F2E8`、强调色 `356859`；创建并应用后，下拉框、成功提示、纸张背景和绿色强调色均即时正确显示。
+- **关闭守卫：** 创建对话框打开时父设置窗「关闭」禁用；点击原生窗口 X 后应用未退出，创建对话框和父设置窗保留，并提示「草稿尚未完成保存或仍在输入法组词，已取消关闭。」。
+- **重命名：** 在管理自定义主题分区将「原生纸墨」改为「原生青墨」，下拉框与管理列表同步更新。
+- **删除：** 确认删除后管理入口消失，主题回退「跟随系统」，界面恢复默认朱砂色。最终隔离 `settings.json` 的 `themeMode` 为 `system`、`customThemes` 为 `[]`。
+- 关闭设置返回空书架后，通过原生 X 正常退出；PID **9196** 已退出，既有 **6 个**进程仍在且路径不变。stderr 仅 Impeller OpenGL 后端说明，无 Dart 异常。
+- 当时非阻断观察：重命名对话框输入区域偏高，功能及关闭流程不受影响；该视觉问题随后在 §14 单独修正并复验。文本通过真实窗口输入粘贴完成，不外推为完整中文输入法候选窗、多屏、DPI／文字缩放或无障碍矩阵验收。
+
+## 14. P2 主题重命名输入区域收窄（2026-10-29）
+
+### 根因与自动化
+
+- 原生现象可在组件测试稳定复现：1568×1007 测试视口下，重命名 `TextBox` 高度为 **595 px**。`ContentDialog` 以两层 `Flexible` 布局内容，直接放置的输入框会占用剩余最大高度；仅增加 `maxLines: 1` 不改变该高度，未作为修正保留。
+- 将内容改为 `mainAxisSize: MainAxisSize.min`、横向拉伸的 `Column`，使输入框按固有高度布局。新增大窗口高度不超过 48 px 的回归，先得到 **595 px** 的预期失败，再转为通过；空白名称禁用及确认修剪既有测试继续通过。
+- `flutter analyze --no-pub` 无问题；完整套件 **344 项全部通过**。沿用 §13 的隔离源码副本同步这一处生产修正，Windows x64 release 构建成功；未声称被 6 个既有实例占用的原目录构建成功。
+
+### 原生复验与清理
+
+- 使用独立数据根 `.devdata/p2-rename-native-acceptance-20261029-2149/data` 和 `NWW_DEV_PAGE=settings` 启动 PID **37116**，未读取或修改默认 AppData 作品。
+- 创建临时主题「紧凑布局验收」后打开重命名对话框，真实 UIA 测得输入区域为 **391×38 px**；对话框恢复紧凑布局，不再出现大段输入空白。实际改名为「紧凑布局已验收」，下拉框和管理列表同步更新。
+- 删除临时主题后回退「跟随系统」，最终 `settings.json` 的 `themeMode` 为 `system`、`customThemes` 为 `[]`。关闭设置返回空书架，再通过原生 X 正常退出；PID **37116** 已退出，既有 **6 个**进程保持未动，stderr 仅 Impeller OpenGL 后端说明，无 Dart 异常。
+

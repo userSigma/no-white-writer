@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../core/chapter_display.dart';
 import '../core/chapter_numbering.dart';
 import '../core/ids.dart';
 import '../core/models.dart';

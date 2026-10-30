@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/app_harness.dart';
 import 'support/widget_harness.dart';
 
@@ -24,7 +25,7 @@ Future<AppHarness> _workspace(WidgetTester tester, double width) async {
   await tester.pumpWidget(
     FluentApp(
       theme: buildFluentTheme(AppThemeData.light),
-      home: EditorPage(app: h.app, book: book),
+      home: editorPage(app: h.app, book: book),
     ),
   );
   await finishIo(tester, until: () => editorReady(tester));
