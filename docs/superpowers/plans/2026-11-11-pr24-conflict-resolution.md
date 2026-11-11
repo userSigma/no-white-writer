@@ -20,7 +20,7 @@
 
 相关测试改用 `chapter_display`、`uiGuards` 和页面装配辅助函数；独立目录分区测试覆盖选择取消、立即保存、失败重试、在途关闭保护与恢复默认。保留 P2 架构边界、紧凑重命名及恢复数量测试。
 
-## 本地验证
+## 本地验证（首次整合）
 
 - [x] 重点回归：79 项通过，包含双方布局、P2 边界、目录分区、标题栏关闭、字体和编号测试。
 - [x] 全量串行测试：`flutter test --no-pub --concurrency=1`，451 项通过，0 失败，用时 6 分 19 秒。
@@ -29,6 +29,16 @@
 - [x] Windows Release 与 Inno Setup 构建：Release 89.8 秒，Inno 6.7.3 编译 27.765 秒。
 - [x] 只读资源核验：应用与安装器均为 `0.5.0.0`，SHA-256 sidecar 一致。安装器 20,927,842 字节，SHA-256 `6fbc05b4ef3dbb4b1176f011592710ff5518f17c016133a8b5ddd9f92c956630`。
 - [x] 冲突标记扫描与 CRLF-aware `git diff --check` 通过。
+
+## CI 反馈与校验修复
+
+首轮 [CI 43008722239](https://github.com/userSigma/no-white-writer/actions/runs/43008722239) 的质量检查通过；Windows Release 与 Inno 编译成功，但安装器校验阶段报 `Get-FileHash ... is not recognized`，因此整轮 CI 未通过，也未执行合并。
+
+- 将安装器 SHA-256 计算移至独立 Dart 流式函数，移除 PowerShell 模块依赖；未放宽 CI 或分支门禁。
+- 将锁文件中已有的 `crypto 3.0.7` 声明为直接开发依赖，未增加应用运行时依赖，也未升级任何包版本。
+- 先观察到禁止旧模块依赖的回归测试失败，再完成修复；新增空文件、Unicode/引号路径、跨块大文件、输入缺失四项行为测试。
+- 修复后的安装器重点测试 47 项通过，静态分析通过；重新使用已验证 Release 编译安装器，Inno 编译 17.844 秒，独立 Python 校验 sidecar 与 SHA-256 一致，产物字节与首次构建相同。
+- 修复后再次全量串行测试：456 项通过、0 失败，用时 5 分 51 秒；最终格式检查 126 个 Dart 文件、0 改动，静态分析 No issues found。
 
 ## 远端执行门禁
 

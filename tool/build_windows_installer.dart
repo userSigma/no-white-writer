@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'installer_checksum.dart';
 import 'installer_config.dart';
 
 const _usage = '''
@@ -81,7 +82,7 @@ Future<void> main(List<String> arguments) async {
         'ISCC did not produce the expected installer: ${setup.path}',
       );
     }
-    final hash = await _sha256(setup);
+    final hash = await installerSha256(setup);
     File('${setup.path}.sha256')
         .writeAsStringSync('$hash  ${version.filename}\n');
     stdout.writeln('Installer: ${setup.path} (${setup.lengthSync()} bytes)');
@@ -196,20 +197,4 @@ Future<void> _run(
       code,
     );
   }
-}
-
-Future<String> _sha256(File file) async {
-  // A native command, not an unsigned .ps1 file or an execution-policy override.
-  final literal = file.path.replaceAll("'", "''");
-  final result = await Process.run('powershell.exe', [
-    '-NoProfile',
-    '-NonInteractive',
-    '-Command',
-    "(Get-FileHash -LiteralPath '$literal' -Algorithm SHA256).Hash",
-  ]);
-  final hash = (result.stdout as String).trim().toLowerCase();
-  if (result.exitCode != 0 || !RegExp(r'^[0-9a-f]{64}$').hasMatch(hash)) {
-    throw StateError('Unable to hash installer: ${result.stderr}');
-  }
-  return hash;
 }

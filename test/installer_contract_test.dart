@@ -13,6 +13,13 @@ String installerSource() {
 }
 
 void main() {
+  test('installer checksum does not depend on PowerShell modules', () {
+    final builder = File('tool/build_windows_installer.dart')
+        .readAsStringSync();
+    expect(builder, isNot(contains('Get-FileHash')));
+    expect(builder, isNot(contains('powershell.exe')));
+  });
+
   test(
     'installer has a stable AppId and an unelevated per-user destination',
     () {
