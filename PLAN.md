@@ -142,14 +142,14 @@ cmd /c mklink /J "$sym\window_manager" "<pub-cache>\window_manager-0.5.2"
 | Q15 | 技术选型 | 依赖 3 个（path_provider、window_manager、fluent_ui）；状态用 `ChangeNotifier` + `ValueListenableBuilder`；导航 `Navigator 1.0` |
 | Q16 | 分发与单实例 | Inno Setup 安装包；运行期文件锁检测单实例并提示 |
 | Q17 | 三方 UI 库 | 引入 `fluent_ui`，`FluentIcons` 取代 Material 图标；Android 的桌面观感留到平台适配阶段 |
-| Q18 | 标题栏与底色 | 系统原生标题栏；不透明纸感底（暖白 `#F7F3EC`、墨色 `#17181A`）；**不做 Mica、不自绘标题栏** |
+| Q18 | 标题栏与底色 | 2026-11-05 作者确认：隐藏系统标题栏，与现有工具栏合并为单条 36px 自绘顶栏；保留原生缩放边缘、拖动/最大化与关闭保存保护；书架左侧品牌标题、写作页左侧收起/返回。底色沿用当前纯白/纯黑及自定义主题，不做 Mica。详见 [合并标题栏规格](docs/superpowers/specs/2026-11-05-merged-titlebar-design.md)。 |
 | Q19 | 签名 | 不签名；接受 SmartScreen 首次提示；Release 附 SHA256 |
 | Q20 | 排版 | 首行缩进在**存储层真插两个 U+3000**；段间默认不空行、可选开启；行距默认 1.9（可调 1.4–2.4）；v1 字体固定，只调字号 |
 | Q21 | 查找替换 | 仅当前章；「全部替换」弹确认并显示替换条数；不做大小写敏感；保留全角/半角匹配开关 |
 | Q22 | 保存节奏 | 固定 5 s 不可配置；加每日自动备份 |
 | Q23 | 标识 | 包名 `no_white_writer`、exe `no_white_writer.exe`、org `com.usersigma`、版本 `0.1.0`、Inno AppId `ce99ca45-fdcf-4d6f-8f1c-74f7dd3b086b`；窗口标题与快捷方式「不白写作」 |
 | Q24 | 里程碑 | M1 可写闭环（书架/卷章树/编辑器/自动保存/崩溃恢复/单章导出）；M2 完整版（查找替换/Fluent 打磨/卷与书导出/整库 zip/安装器/专注模式） |
-| Q25 | 安装与卸载 | 按用户安装到 `%LOCALAPPDATA%\Programs\不白写作`，不弹 UAC；卸载默认保留作品，勾选「同时删除我的作品」才删；卸载器**永不主动**碰 `%APPDATA%\不白写作` |
+| Q25 | 安装与卸载 | 按用户安装到 `%LOCALAPPDATA%\Programs\不白写作`，不弹 UAC；2026-11-06 作者确认：卸载始终保留作品、设置和导出文件，不提供删除作品选项；卸载器**永不主动**碰 `%APPDATA%\不白写作` |
 | Q26 | 编辑器实现 | 外壳控件用 `fluent_ui`；正文用**裸 `TextField`**（精确控制 controller / composing / UndoHistory / 自动保存） |
 | Q27 | 回车缩进 | 回车自动补两个 U+3000；新行已有则不重复；段中回车前半保留、后半补缩进；粘贴不自动补（「规整缩进」列 v1.1）；首段也缩进、可手动删 |
 | Q28 | 兼容性闸门 | Gate 0 在示例工程验证 fluent_ui 能编译 + 中文输入可用；不通过则回落「自绘 Fluent 观感」，架构与数据层不动 |
@@ -837,7 +837,7 @@ onExitRequested
 - [ ] 整库 zip 备份（手动）+ 每日自动备份（保留 7 份、临时 zip 改名、失败静默记日志）。
 - [ ] 主题打磨：亮/暗全量过一遍，卡片书脊 12 色，深色下正文对比度 ≥ 7:1。
 - [ ] 图标与版本信息：`app_icon.ico`、`Runner.rc`（产品名「不白写作」、公司 `com.usersigma`、版本 0.1.0）、窗口标题动态格式。
-- [ ] Inno Setup 脚本 `installer/no_white_writer.iss`：`PrivilegesRequired=lowest`、`DefaultDirName={localappdata}\Programs\不白写作`、`AppId=ce99ca45-fdcf-4d6f-8f1c-74f7dd3b086b`、卸载保留数据（勾选项「同时删除我的作品」）。
+- [x] Inno Setup 脚本 `installer/no_white_writer.iss`：`PrivilegesRequired=lowest`、`DefaultDirName={localappdata}\Programs\不白写作`、`AppId=ce99ca45-fdcf-4d6f-8f1c-74f7dd3b086b`、卸载始终保留作品与设置，不提供删除作品选项（2026-11-06 确认）。
 - [ ] `v0.1.0-m2` tag。
 
 ### 10.4 M3：收尾与发布（1.5 天）
@@ -900,7 +900,7 @@ onExitRequested
 **安装与分发**
 - [ ] 未签名安装包首次运行有 SmartScreen 提示（属预期）
 - [ ] 安装到 `%LOCALAPPDATA%\Programs\不白写作`，不弹 UAC
-- [ ] 卸载默认保留作品；勾选「同时删除我的作品」才清空
+- [x] 卸载始终保留作品、设置与导出文件，无删除数据选项（2026-11-06 确认并完成隔离卸载验证）
 - [ ] 覆盖安装新版本（同 AppId）保留数据与设置
 - [ ] 双击第二个实例 → 提示已在运行，不产生第二个窗口
 

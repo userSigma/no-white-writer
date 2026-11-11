@@ -19,8 +19,11 @@ import 'context_menu.dart';
 import 'editor_page.dart';
 import 'export_notice.dart';
 import 'format.dart';
+import 'hover_actions.dart';
+import 'menu_surface.dart';
 import 'settings_menu.dart';
 import 'theme/tokens.dart';
+import 'window_title_bar.dart';
 
 class ShelfPage extends StatefulWidget {
   const ShelfPage({
@@ -38,6 +41,15 @@ class ShelfPage extends StatefulWidget {
 
 class _ShelfPageState extends State<ShelfPage> {
   final _focus = FocusNode(debugLabel: 'shelf');
+  final _searchFocus = FocusNode(debugLabel: 'shelf-search');
+  String _query = '';
+  List<BookSummary> get _visibleBooks {
+    final query = _query.trim().toLowerCase();
+    return widget.app.library.books
+        .where((book) => book.title.toLowerCase().contains(query))
+        .toList();
+  }
+
   final Map<String, GlobalKey> _cards = {};
   final _settingsKey = GlobalKey<SettingsMenuButtonState>();
   int _selected = 0;
@@ -67,16 +79,14 @@ class _ShelfPageState extends State<ShelfPage> {
     widget.app.library.removeListener(_changed);
     widget.app.exporter.removeListener(_changed);
     _focus.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
   void _changed() {
     if (mounted) {
       setState(() {
-        _selected = _selected.clamp(
-          0,
-          math.max(0, widget.app.library.books.length - 1),
-        );
+        _selected = _selected.clamp(0, math.max(0, _visibleBooks.length - 1));
       });
     }
   }
@@ -249,8 +259,10 @@ class _ShelfPageState extends State<ShelfPage> {
   }
 
   KeyEventResult _key(FocusNode node, KeyEvent event) {
-    final books = widget.app.library.books;
-    if (books.isEmpty || (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
+    final books = _visibleBooks;
+    if (_searchFocus.hasFocus ||
+        books.isEmpty ||
+        (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
       return KeyEventResult.ignored;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
@@ -280,9 +292,52 @@ class _ShelfPageState extends State<ShelfPage> {
     return KeyEventResult.ignored;
   }
 
+  Widget _newBookTile(BuildContext context) =>
+      _NewBookTile(onPressed: widget.app.exporter.busy ? null : _createBook);
+
+  Widget _shelfActions(LibraryController library) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox(
+        width: 124,
+        child: ComboBox<LibrarySort>(
+          value: library.sort,
+          items: const [
+            ComboBoxItem(value: LibrarySort.recent, child: Text('最近编辑')),
+            ComboBoxItem(value: LibrarySort.title, child: Text('按书名')),
+          ],
+          onChanged: (value) {
+            if (value != null) library.setSort(value);
+            _focus.requestFocus();
+          },
+        ),
+      ),
+      const SizedBox(width: 8),
+      SettingsMenuButton(
+        key: _settingsKey,
+        app: widget.app,
+        secondary: true,
+        enabled: !widget.app.exporter.busy,
+        beforeOpen: () async {
+          _focus.requestFocus();
+          return true;
+        },
+      ),
+      const SizedBox(width: 8),
+      FilledButton(
+        onPressed: widget.app.exporter.busy ? null : _createBook,
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [Icon(FluentIcons.add), SizedBox(width: 6), Text('新建')],
+        ),
+      ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final library = widget.app.library;
+    final books = _visibleBooks;
     return Container(
       color: paperOrInk(context),
       child: Focus(
@@ -292,73 +347,88 @@ class _ShelfPageState extends State<ShelfPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            WindowTitleBar(
+              platform: widget.app.platform,
+              leading: const WindowBrand(),
+              draggableLeading: true,
+            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
-              child: Row(
-                children: [
-                  Text(
-                    '不白写作',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2,
-                      color: bodyTextColor(context),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(
-                    library.loading
-                        ? '正在打开书架…'
-                        : '${library.books.length} 本 · ${library.sort == LibrarySort.recent ? '最近编辑在前' : '按书名排序'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: bodyTextColor(context),
-                    ),
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    width: 124,
-                    child: ComboBox<LibrarySort>(
-                      value: library.sort,
-                      items: const [
-                        ComboBoxItem(
-                          value: LibrarySort.recent,
-                          child: Text('最近编辑'),
+              padding: const EdgeInsets.fromLTRB(28, 20, 28, 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  const maxSearch = 320.0;
+                  final side = math.max(
+                    0.0,
+                    (constraints.maxWidth - maxSearch) / 2 - 16,
+                  );
+                  final searchWidth = math.min(
+                    maxSearch,
+                    math.max(120.0, constraints.maxWidth - 2 * side),
+                  );
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: side,
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  flex: 3,
+                                  child: Text(
+                                    '全部作品',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 2,
+                                      color: bodyTextColor(context),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Flexible(
+                                  flex: 2,
+                                  child: Text(
+                                    library.loading
+                                        ? '正在打开书架…'
+                                        : '共 ${library.books.length} 部作品 · 累计 ${library.books.fold<int>(0, (total, book) => total + book.wordCount)} 字',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: bodyTextColor(context),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          _shelfActions(library),
+                        ],
+                      ),
+                      SizedBox(
+                        width: searchWidth,
+                        child: TextBox(
+                          key: const ValueKey('shelf-search'),
+                          focusNode: _searchFocus,
+                          placeholder: '搜索作品',
+                          prefix: const Padding(
+                            padding: EdgeInsets.only(left: 10),
+                            child: Icon(FluentIcons.search, size: 14),
+                          ),
+                          onChanged: (value) => setState(() {
+                            _query = value;
+                            _selected = 0;
+                          }),
                         ),
-                        ComboBoxItem(
-                          value: LibrarySort.title,
-                          child: Text('按书名'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) library.setSort(value);
-                        _focus.requestFocus();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SettingsMenuButton(
-                    key: _settingsKey,
-                    app: widget.app,
-                    enabled: !widget.app.exporter.busy,
-                    beforeOpen: () async {
-                      _focus.requestFocus();
-                      return true;
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: widget.app.exporter.busy ? null : _createBook,
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(FluentIcons.add),
-                        SizedBox(width: 6),
-                        Text('新建'),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             Divider(
@@ -373,26 +443,6 @@ class _ShelfPageState extends State<ShelfPage> {
             Expanded(
               child: library.loading
                   ? const Center(child: ProgressRing())
-                  : library.books.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(FluentIcons.library, size: 46),
-                          const SizedBox(height: 14),
-                          const Text('书架还空着'),
-                          const SizedBox(height: 6),
-                          const Text('新建一本，开始写第一段。'),
-                          const SizedBox(height: 18),
-                          FilledButton(
-                            onPressed: widget.app.exporter.busy
-                                ? null
-                                : _createBook,
-                            child: const Text('新建作品'),
-                          ),
-                        ],
-                      ),
-                    )
                   : LayoutBuilder(
                       builder: (context, constraints) {
                         final width = math.max(
@@ -404,16 +454,20 @@ class _ShelfPageState extends State<ShelfPage> {
                           8,
                         );
                         return GridView.builder(
+                          key: const ValueKey('shelf-book-grid'),
                           padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
                           gridDelegate: _FixedCardGridDelegate(
                             crossAxisCount: columns,
                             crossAxisSpacing: 20,
                             mainAxisSpacing: 26,
-                            mainAxisExtent: 300,
+                            mainAxisExtent: math.min(220, width) * 4 / 3,
                           ),
-                          itemCount: library.books.length,
+                          itemCount: books.length + 1,
                           itemBuilder: (context, index) {
-                            final summary = library.books[index];
+                            if (index == books.length) {
+                              return _newBookTile(context);
+                            }
+                            final summary = books[index];
                             return _BookCard(
                               key: _cards.putIfAbsent(
                                 summary.id,
@@ -438,6 +492,34 @@ class _ShelfPageState extends State<ShelfPage> {
       ),
     );
   }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(6)),
+      );
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (final metric in path.computeMetrics()) {
+      for (double offset = 0; offset < metric.length; offset += 10) {
+        canvas.drawPath(
+          metric.extractPath(offset, math.min(offset + 5, metric.length)),
+          paint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
+      color != oldDelegate.color;
 }
 
 class _FixedCardGridDelegate extends SliverGridDelegate {
@@ -470,6 +552,78 @@ class _FixedCardGridDelegate extends SliverGridDelegate {
       mainAxisExtent != old.mainAxisExtent;
 }
 
+class _NewBookTile extends StatefulWidget {
+  const _NewBookTile({required this.onPressed});
+  final VoidCallback? onPressed;
+
+  @override
+  State<_NewBookTile> createState() => _NewBookTileState();
+}
+
+class _NewBookTileState extends State<_NewBookTile> {
+  bool _hovered = false;
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    final active = enabled && (_hovered || _focused);
+    final dark = FluentTheme.of(context).brightness == Brightness.dark;
+    final accent = dark ? accentSoftColor(context) : accentColor(context);
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Focus(
+        canRequestFocus: false,
+        onFocusChange: (focused) => setState(() => _focused = focused),
+        child: Tooltip(
+          message: '创建新作品',
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            decoration: BoxDecoration(
+              color: active
+                  ? Color.lerp(paperOrInk(context), accent, dark ? .12 : .05)
+                  : paperOrInk(context),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: CustomPaint(
+              foregroundPainter: _DashedBorderPainter(
+                active ? accent : hairlineColor(context),
+              ),
+              // Activate the focused tile before the shelf's ancestor Enter
+              // shortcut can open the currently selected existing book.
+              child: Shortcuts(
+                shortcuts: const {
+                  SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+                  SingleActivator(LogicalKeyboardKey.numpadEnter):
+                      ActivateIntent(),
+                },
+                child: Button(
+                  key: const ValueKey('shelf-new-book-tile'),
+                  style: borderlessRowStyle(
+                    background: Colors.transparent,
+                    foreground: active ? accent : mutedTextColor(context),
+                  ),
+                  onPressed: widget.onPressed,
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(FluentIcons.add, size: 28),
+                      SizedBox(height: 12),
+                      Text('新建作品'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BookCard extends StatefulWidget {
   const _BookCard({
     super.key,
@@ -495,138 +649,156 @@ class _BookCardState extends State<_BookCard> {
     final fg = bodyTextColor(context);
     final light = FluentTheme.of(context).brightness == Brightness.light;
     final card = light ? const Color(0xFFFCFAF5) : const Color(0xFF1E1F22);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => hover = true),
-      onExit: (_) => setState(() => hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onSecondaryTapDown: (d) => widget.onMenu(d.globalPosition),
-        onLongPressStart: (d) => widget.onMenu(d.globalPosition),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          transform: Matrix4.translationValues(0, hover ? -3 : 0, 0),
-          decoration: BoxDecoration(
-            boxShadow: [
-              if (hover)
-                BoxShadow(
-                  color: const Color(0x00000000)
-                      .withValues(alpha: light ? 0.10 : 0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: card,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
+    return HoverActionRegion(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => hover = true),
+        onExit: (_) => setState(() => hover = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          onSecondaryTapDown: (d) => widget.onMenu(d.globalPosition),
+          onLongPressStart: (d) => widget.onMenu(d.globalPosition),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            transform: Matrix4.translationValues(0, hover ? -3 : 0, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AspectRatio(
+                  aspectRatio: 3 / 4,
+                  child: Container(
+                    key: ValueKey('book-cover-${widget.summary.id}'),
+                    decoration: BoxDecoration(
                       color: widget.selected
-                          ? accentColor(context)
-                          : hairlineColor(context),
-                      width: widget.selected ? 1.6 : 1,
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        width: 15,
-                        decoration: BoxDecoration(
-                          gradient: spineGradient(widget.summary.coverSeed),
+                          ? Color.lerp(card, accentColor(context), 0.06)
+                          : card,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: hairlineColor(context)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: light
+                                ? (hover ? 0.10 : 0.04)
+                                : (hover ? 0.35 : 0.18),
+                          ),
+                          blurRadius: hover ? 18 : 8,
+                          offset: Offset(0, hover ? 8 : 3),
                         ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 16, 12, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.summary.title,
-                                maxLines: 4,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: fg,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '不白写作',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  letterSpacing: 4,
-                                  color: mutedTextColor(context)
-                                      .withValues(alpha: 0.7),
-                                ),
-                              ),
-                            ],
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Container(
+                          width: 15,
+                          decoration: BoxDecoration(
+                            gradient: spineGradient(widget.summary.coverSeed),
                           ),
                         ),
-                      ),
-                    ],
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 16, 12, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.summary.title,
+                                  maxLines: 4,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: fg,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            widget.stats,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: widget.selected
+                                                  ? (light
+                                                        ? accentColor(context)
+                                                        : Color.lerp(
+                                                            accentColor(
+                                                              context,
+                                                            ),
+                                                            fg,
+                                                            .6,
+                                                          ))
+                                                  : mutedTextColor(context),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            relativeTime(
+                                              widget.summary.updatedAt,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: mutedTextColor(context),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    HoverAction(
+                                      child: SizedBox.square(
+                                        dimension: 28,
+                                        child: Builder(
+                                          builder: (buttonContext) => Tooltip(
+                                            message: '作品菜单',
+                                            child: IconButton(
+                                              key: ValueKey(
+                                                'book-menu-${widget.summary.id}',
+                                              ),
+                                              icon: const Icon(
+                                                FluentIcons.more,
+                                                size: 14,
+                                              ),
+                                              onPressed: () {
+                                                final box =
+                                                    buttonContext
+                                                            .findRenderObject()!
+                                                        as RenderBox;
+                                                widget.onMenu(
+                                                  box.localToGlobal(
+                                                    Offset(0, box.size.height),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.summary.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: fg,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 28,
-                    height: 26,
-                    child: Builder(
-                      builder: (buttonContext) => Tooltip(
-                        message: '作品菜单',
-                        child: IconButton(
-                          key: ValueKey('book-menu-${widget.summary.id}'),
-                          icon: const Icon(FluentIcons.more, size: 14),
-                          onPressed: () {
-                            final box =
-                                buttonContext.findRenderObject()! as RenderBox;
-                            widget.onMenu(
-                              box.localToGlobal(Offset(0, box.size.height)),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                widget.stats,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: mutedTextColor(context)),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                relativeTime(widget.summary.updatedAt),
-                style: TextStyle(fontSize: 11, color: mutedTextColor(context)),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

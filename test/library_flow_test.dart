@@ -102,7 +102,7 @@ void main() {
 
     final BookIndex reloaded = await h.books.load(summary);
     expect(reloaded.volumes, hasLength(2));
-    expect(reloaded.volumes[1].chapters.single.title, '未命名章节');
+    expect(reloaded.volumes[1].chapters.single.title, '');
   });
 
   test('重命名与排序会立刻落盘', () async {

@@ -8,15 +8,16 @@ import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
 import 'support/widget_harness.dart';
+import 'support/fake_platform.dart';
 
 void main() {
-  test('只改纯白纯黑内容底色，其余 token 和 Fluent 配置恢复 0.2', () {
+  test('纯白纯黑内容底色及既有 Fluent 配置保持，品牌色统一暖棕红', () {
     expect(AppColors.paper, const Color(0xFFFFFFFF));
     expect(AppColors.ink, const Color(0xFF000000));
     expect(AppColors.textOnPaper, const Color(0xFF2B2A27));
     expect(AppColors.textOnInk, const Color(0xFFEDE8DF));
-    expect(AppColors.cinnabar, const Color(0xFFA6402B));
-    expect(AppColors.cinnabarSoft, const Color(0xFFC9795F));
+    expect(AppColors.cinnabar, const Color(0xFF8C3A2B));
+    expect(AppColors.cinnabarSoft, const Color(0xFFB76B5C));
     expect(AppColors.hairlineOnPaper, const Color(0xFFE3DACB));
     expect(AppColors.hairlineOnInk, const Color(0xFF2B2D31));
     expect(AppColors.mutedOnPaper, const Color(0xFF7A7267));
@@ -28,11 +29,11 @@ void main() {
         brightness: b,
         scaffoldBackgroundColor: bg,
         accentColor: AccentColor.swatch(const {
-          'normal': Color(0xFFA6402B),
-          'light1': Color(0xFFC9795F),
-          'light2': Color(0xFFD9A28D),
-          'dark1': Color(0xFF8E3524),
-          'dark2': Color(0xFF6E291C),
+          'normal': Color(0xFF8C3A2B),
+          'light1': Color(0xFFB76B5C),
+          'light2': Color(0xFFD6A397),
+          'dark1': Color(0xFF702E22),
+          'dark2': Color(0xFF54231A),
         }),
       );
       expect(t.scaffoldBackgroundColor, bg);
@@ -61,7 +62,7 @@ void main() {
   });
 
   for (final b in Brightness.values) {
-    testWidgets('设置浮窗保留 0.2 朱砂与 Fluent 通知，仅内容底色纯白纯黑：$b', (tester) async {
+    testWidgets('设置浮窗使用暖棕红与 Fluent 通知，内容底色纯白纯黑：$b', (tester) async {
       final h = await widgetHarness(tester);
       h.app.settings.setThemeMode(b == Brightness.light ? 'light' : 'dark');
       await tester.pumpWidget(NoWhiteWriterApp(app: h.app));
@@ -87,11 +88,15 @@ void main() {
       expect(find.text('深色（纯黑）'), findsWidgets);
       final headings = tester
           .widgetList<Text>(find.byType(Text))
-          .where((t) => t.style?.color == const Color(0xFFA6402B));
+          .where((t) => t.style?.color == const Color(0xFF8C3A2B));
       expect(headings, isNotEmpty, reason: '0.2 的设置标题为朱砂，而非强制黑白');
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await finishIo(tester);
-      await tester.tap(find.text('保存'));
+      (h.app.platform as FakePlatformServices).directoryToSelect =
+          '${h.root.path}/exports';
+      await tester.tap(
+        find.byKey(const ValueKey('settings-change-export-path')),
+      );
       await finishIo(
         tester,
         until: () => find.text('导出目录已保存').evaluate().isNotEmpty,
@@ -139,7 +144,7 @@ void main() {
       final body = tester.widget<TextField>(
         find.byKey(const ValueKey('chapter-body')),
       );
-      expect(body.cursorColor, const Color(0xFFA6402B));
+      expect(body.cursorColor, const Color(0xFF8C3A2B));
       expect(
         tester
             .widgetList<Container>(find.byType(Container))

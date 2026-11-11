@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show Size;
+
+import 'package:flutter/foundation.dart';
 
 import 'package:no_white_writer/core/platform/platform_services.dart';
 
@@ -17,6 +20,52 @@ class FakePlatformServices implements PlatformServices {
   bool revealed = false;
   bool revealResult = true;
   bool quitCalled = false;
+  @override
+  bool supportsCustomTitleBar = true;
+  @override
+  final ValueNotifier<DesktopWindowState> windowState = ValueNotifier(
+    const DesktopWindowState(),
+  );
+  int minimizeCalls = 0, maximizeCalls = 0, dragCalls = 0, closeCalls = 0;
+  Future<void> Function()? onRequestClose;
+
+  @override
+  Future<void> minimizeWindow() async {
+    minimizeCalls++;
+  }
+
+  @override
+  Future<void> toggleWindowMaximized() async {
+    maximizeCalls++;
+    windowState.value = DesktopWindowState(
+      maximized: !windowState.value.maximized,
+    );
+  }
+
+  @override
+  Future<void> startWindowDrag() async {
+    dragCalls++;
+  }
+
+  @override
+  Future<void> requestWindowClose() async {
+    closeCalls++;
+    await onRequestClose?.call();
+  }
+
+  String? directoryToSelect;
+  Object? directoryError;
+  String? directoryInitialPath;
+  Completer<String?>? directorySelection;
+
+  @override
+  Future<String?> selectDirectory({String? initialDirectory}) async {
+    directoryInitialPath = initialDirectory;
+    if (directoryError != null) throw directoryError!;
+    return directorySelection == null
+        ? directoryToSelect
+        : await directorySelection!.future;
+  }
 
   @override
   String get platformLabel => 'test';

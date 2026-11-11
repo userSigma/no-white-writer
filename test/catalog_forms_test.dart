@@ -4,12 +4,14 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/core/models.dart';
+import 'package:no_white_writer/core/chapter_numbering.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
 import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/book_details_dialog.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 
 class _FaultWriter extends AtomicFileWriter {
   bool fail = false;
@@ -81,7 +83,7 @@ void main() {
     );
     await finishIo(tester, until: () => editorReady(tester));
     Future<void> rename() async {
-      await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
+      await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${v.id}')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('重命名'));
       await tester.pumpAndSettle();
@@ -130,6 +132,10 @@ void main() {
     final book = (await tester.runAsync(() async {
       final summary = await h.app.library.createBook('占位');
       final b = await h.app.library.openBook(summary);
+      await h.app.library.structure.setGlobalNumbering(
+        b,
+        const ChapterNumbering(),
+      );
       await h.app.library.structure.renameVolume(b, b.volumes.first, '');
       await h.app.library.structure.renameChapter(b, b.allChapters.first, '');
       return b;
@@ -195,7 +201,7 @@ void main() {
         await tester.pumpAndSettle();
       }
       final selected = h.app.editor.chapter!.id;
-      await tester.tap(menu);
+      await tapWithMouse(tester, menu);
       await tester.pumpAndSettle();
       await tester.tap(find.text('重命名章'));
       await tester.pumpAndSettle();
@@ -217,6 +223,9 @@ void main() {
         final s = await h.app.library.createBook('章名失败草稿');
         final b = await h.app.library.openBook(s);
         await h.app.library.structure.appendChapter(b, b.volumes.first);
+        for (final chapter in b.allChapters) {
+          await h.app.library.structure.renameChapter(b, chapter, '原章名');
+        }
         return b;
       }))!;
       final v = book.volumes.first;
@@ -233,7 +242,7 @@ void main() {
         await tester.tap(find.byKey(ValueKey('toggle-volume-${v.id}')));
         await tester.pumpAndSettle();
       }
-      await tester.tap(menu);
+      await tapWithMouse(tester, menu);
       await tester.pumpAndSettle();
       await tester.tap(find.text('重命名章'));
       await tester.pumpAndSettle();
@@ -246,7 +255,7 @@ void main() {
         expect(input, findsOneWidget);
         expect(tester.widget<TextBox>(input).controller!.text, '');
         expect(find.textContaining('forms fault'), findsWidgets);
-        expect(c.title, '未命名章节');
+        expect(c.title, '原章名');
       } finally {
         writer.fail = false;
       }
@@ -264,7 +273,13 @@ void main() {
     final h = await widgetHarness(tester);
     final book = (await tester.runAsync(() async {
       final s = await h.app.library.createBook('章名组合态');
-      return h.app.library.openBook(s);
+      final b = await h.app.library.openBook(s);
+      await h.app.library.structure.renameChapter(
+        b,
+        b.allChapters.first,
+        '原章名',
+      );
+      return b;
     }))!;
     final v = book.volumes.first, c = v.chapters.first;
     await tester.pumpWidget(
@@ -280,7 +295,7 @@ void main() {
       await tester.pumpAndSettle();
     }
     Future<void> openName() async {
-      await tester.tap(menu);
+      await tapWithMouse(tester, menu);
       await tester.pumpAndSettle();
       await tester.tap(find.text('重命名章'));
       await tester.pumpAndSettle();
@@ -325,7 +340,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(input, findsNothing, reason: '已结束组词后的 Escape 应真正取消对话框');
-    expect(c.title, '未命名章节');
+    expect(c.title, '原章名');
     expect((await tester.runAsync(file.readAsBytes))!, before);
     await openName();
     await tester.enterText(input, ' ');
@@ -358,7 +373,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('open-chapter-pane')));
         await tester.pumpAndSettle();
       }
-      await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
+      await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${v.id}')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('重命名'));
       await tester.pumpAndSettle();
@@ -427,7 +442,7 @@ void main() {
     );
     await finishIo(tester, until: () => editorReady(tester));
     Future<void> settings() async {
-      await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
+      await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${v.id}')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('章节编号'));
       await tester.pumpAndSettle();

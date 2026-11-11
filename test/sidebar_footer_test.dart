@@ -33,7 +33,7 @@ Future<AppHarness> _workspace(WidgetTester tester, double width) async {
 
 void main() {
   for (final width in [1280.0, 1100.0, 900.0]) {
-    testWidgets('$width 返回和设置只属于展开目录底部，收起后一起隐藏', (tester) async {
+    testWidgets('$width 返回位于目录左上，收起后主导航仍可达且隐藏设置', (tester) async {
       final h = await _workspace(tester, width);
       if (width < 1000) {
         await tester.tap(find.byKey(const ValueKey('open-chapter-pane')));
@@ -42,14 +42,23 @@ void main() {
       final pane = tester.getRect(
         find.byKey(const ValueKey('chapter-pane-frame')),
       );
-      final back = tester.getRect(find.byKey(const ValueKey('back-to-shelf')));
+      final back = tester.getRect(
+        find.byKey(
+          ValueKey(width < 1000 ? 'pane-back-to-shelf' : 'back-to-shelf'),
+        ),
+      );
       final settings = tester.getRect(
         find.byKey(const ValueKey('settings-button')),
       );
-      expect(back.left, greaterThanOrEqualTo(pane.left));
-      expect(back.right, lessThanOrEqualTo(pane.right));
-      expect(back.bottom, lessThanOrEqualTo(pane.bottom));
-      expect(back.top, greaterThanOrEqualTo(pane.bottom - 52));
+      final bar = tester.getRect(
+        find.byKey(const ValueKey('window-title-bar')),
+      );
+      expect(back.left, inInclusiveRange(bar.left, bar.left + 120));
+      expect(back.right, lessThanOrEqualTo(bar.right));
+      expect(back.top, greaterThanOrEqualTo(bar.top));
+      expect(back.bottom, lessThanOrEqualTo(bar.bottom));
+      expect(back.center.dy, closeTo(bar.center.dy, 1));
+      expect(bar.bottom, lessThanOrEqualTo(pane.top));
       expect(settings.right, lessThanOrEqualTo(pane.right));
       expect(settings.left, greaterThanOrEqualTo(pane.left));
       expect(settings.bottom, lessThanOrEqualTo(pane.bottom));
@@ -62,7 +71,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('toggle-sidebar')));
       }
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('back-to-shelf')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('back-to-shelf')).hitTestable(),
+        findsOneWidget,
+      );
       expect(find.byKey(const ValueKey('settings-button')), findsNothing);
       expect(find.byKey(const ValueKey('chapter-body')), findsOneWidget);
       await finishWidget(tester, h);

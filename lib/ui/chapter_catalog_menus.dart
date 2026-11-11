@@ -31,7 +31,7 @@ class ChapterCatalogMenus {
   final VoidCallback? onCreated;
   WorkspaceController get w => workspace;
   BookIndex get book => w.book;
-  Future<void> _appendVolume(BuildContext context) async {
+  Future<void> appendVolume(BuildContext context) async {
     if (!await nameEditor.submit() || !context.mounted) return;
     await _ask(
       context,
@@ -47,10 +47,7 @@ class ChapterCatalogMenus {
     );
   }
 
-  /// 书名菜单（任务3）：取代侧栏顶部独立的「新建卷」按钮。
-  /// 菜单项：新建卷（复用 [_appendVolume]）、自动章节序号设置（任务4
-  /// 全局层入口）；书名行右键/长按与右端 more 按钮打开同一菜单，
-  /// 预留后续扩展（在此追加 MenuAction 即可）。
+  /// 书名菜单与显式新建卷按钮共用同一受保护入口。
   Future<void> bookMenu(BuildContext context, Offset position) async {
     if (w.editingLocked ||
         w.moving ||
@@ -65,7 +62,7 @@ class ChapterCatalogMenus {
     if (!context.mounted) return;
     switch (action) {
       case 'newVolume':
-        await _appendVolume(context);
+        await appendVolume(context);
       case 'numbering':
         if (!await nameEditor.submit() || !context.mounted) return;
         await showDialog<bool>(

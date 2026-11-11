@@ -11,6 +11,8 @@ import 'core/logging/app_logger.dart';
 import 'core/platform/platform_services.dart';
 import 'state/editor_controller.dart';
 import 'ui/shelf_page.dart';
+import 'ui/window_title_bar.dart';
+import 'ui/theme/app_font.dart';
 import 'ui/theme/live_theme_scope.dart';
 import 'ui/theme/tokens.dart';
 
@@ -33,6 +35,7 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
   ThemeMode _themeMode = ThemeMode.system;
   AppThemeData? _customTheme;
   String? _exitMessage;
+  Future<AppExitResponse>? _pendingExit;
 
   /// 语言切换即时生效：监听 i18n 并重建（builder 里的 I18nScope 由此更新）。
   void _onLanguageChanged() {
@@ -131,8 +134,14 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
     }
   }
 
+  /// 窗口按钮在确认框上仍可用；并发关闭共享一次保存与决策流程。
+  Future<AppExitResponse> _onExitRequested() =>
+      _pendingExit ??= _performExitRequested().whenComplete(() {
+        _pendingExit = null;
+      });
+
   /// 关闭窗口：先强制保存，失败时给「重试 / 导出后退出 / 取消」。
-  Future<AppExitResponse> _onExitRequested() async {
+  Future<AppExitResponse> _performExitRequested() async {
     AppLogger.instance.info('app.exit.requested');
     if (app.exporter.busy ||
         app.editor.isComposing ||
@@ -214,6 +223,7 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
     return FluentApp(
       navigatorKey: _navigatorKey,
       title: '不白写作',
+      debugShowCheckedModeBanner: false,
       // 自定义主题激活时占用 light/dark 两个槽位（themeMode 固定 light），
       // 保证 AnimatedFluentTheme 之下的路由与实时 scope 读到同一份数据。
       theme: custom != null
@@ -240,38 +250,45 @@ class _NoWhiteWriterAppState extends State<NoWhiteWriterApp> {
                   ? Brightness.dark
                   : MediaQuery.platformBrightnessOf(context),
             );
-        return LiveFluentThemeScope(
-          themeData: buildFluentTheme(effective),
-          appTheme: effective,
-          // i18n scope：Navigator 与 overlay 路由（菜单/浮窗）都从这取词，
-          // 与 LiveFluentThemeScope 同层保证语言切换后弹层也换词。
-          child: I18nScope(
-            controller: app.i18n,
-            languageCode: app.i18n.currentCode,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ?child,
-                if (_exitMessage != null)
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 640),
-                        child: InfoBar(
-                          title: Text(_exitMessage!),
-                          severity: InfoBarSeverity.warning,
-                          action: Button(
-                            onPressed: () =>
-                                setState(() => _exitMessage = null),
-                            child: const Text('知道了'),
+        return DefaultTextStyle.merge(
+          // 界面（非编辑区）显式调用系统默认字体，编辑区自身样式优先。
+          style: kSystemUiTextStyle,
+          child: LiveFluentThemeScope(
+            themeData: buildFluentTheme(effective),
+            appTheme: effective,
+            // i18n scope：Navigator 与 overlay 路由（菜单/浮窗）都从这取词，
+            // 与 LiveFluentThemeScope 同层保证语言切换后弹层也换词。
+            child: I18nScope(
+              controller: app.i18n,
+              languageCode: app.i18n.currentCode,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  WindowFrame(
+                    platform: app.platform,
+                    child: child ?? const SizedBox.shrink(),
+                  ),
+                  if (_exitMessage != null)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640),
+                          child: InfoBar(
+                            title: Text(_exitMessage!),
+                            severity: InfoBarSeverity.warning,
+                            action: Button(
+                              onPressed: () =>
+                                  setState(() => _exitMessage = null),
+                              child: const Text('知道了'),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );

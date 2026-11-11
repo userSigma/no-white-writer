@@ -107,6 +107,18 @@ FluentThemeData buildFluentTheme(AppThemeData theme) {
   return FluentThemeData(
     brightness: theme.brightness,
     accentColor: _accentSwatch(theme.accent, builtin: theme.builtin),
+    // Fluent 深色默认黑字、浅色按下态半透明白字，都不适合深棕红。
+    // 内置主按钮各可用状态使用白字；自定义主题保留原资源推导。
+    resources: !theme.builtin
+        ? null
+        : theme.brightness == Brightness.dark
+        ? const ResourceDictionary.dark(
+            textOnAccentFillColorPrimary: Colors.white,
+            textOnAccentFillColorSecondary: Colors.white,
+          )
+        : const ResourceDictionary.light(
+            textOnAccentFillColorSecondary: Colors.white,
+          ),
     scaffoldBackgroundColor: theme.background,
     menuColor: theme.background,
     acrylicBackgroundColor: theme.background,
@@ -114,13 +126,13 @@ FluentThemeData buildFluentTheme(AppThemeData theme) {
   );
 }
 
-/// 朱砂的精确官方色板（保持内置主题与现状逐值一致）。
+/// 内置暖棕红品牌色板；自定义主题仍使用独立派生色板。
 AccentColor _cinnabarSwatch() => AccentColor.swatch(const <String, Color>{
   'normal': AppColors.cinnabar,
   'light1': AppColors.cinnabarSoft,
-  'light2': Color(0xFFD9A28D),
-  'dark1': Color(0xFF8E3524),
-  'dark2': Color(0xFF6E291C),
+  'light2': Color(0xFFD6A397),
+  'dark1': Color(0xFF702E22),
+  'dark2': Color(0xFF54231A),
 });
 
 /// 强调色板：内置朱砂用精确常量；自定义色按 HSL 明度推导五档。

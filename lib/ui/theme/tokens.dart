@@ -13,8 +13,8 @@ class AppColors {
   static const Color ink = Color(0xFF000000);
   static const Color textOnPaper = Color(0xFF2B2A27);
   static const Color textOnInk = Color(0xFFEDE8DF);
-  static const Color cinnabar = Color(0xFFA6402B);
-  static const Color cinnabarSoft = Color(0xFFC9795F);
+  static const Color cinnabar = Color(0xFF8C3A2B);
+  static const Color cinnabarSoft = Color(0xFFB76B5C);
   static const Color hairlineOnPaper = Color(0xFFE3DACB);
   static const Color hairlineOnInk = Color(0xFF2B2D31);
   static const Color mutedOnPaper = Color(0xFF7A7267);

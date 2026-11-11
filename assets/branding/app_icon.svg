@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="840" height="855" viewBox="0 0 840 855" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">不白 LOGO</title>
+  <defs>
+    <linearGradient id="frame-rim" x1="0" y1="0" x2=".7" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#4b4b4b"/>
+      <stop offset=".18" stop-color="#333"/>
+      <stop offset=".73" stop-color="#292929"/>
+      <stop offset="1" stop-color="#161616"/>
+    </linearGradient>
+    <linearGradient id="frame-face" x1=".15" y1="0" x2=".83" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#191919"/>
+      <stop offset=".2" stop-color="#101010"/>
+      <stop offset=".64" stop-color="#141414"/>
+      <stop offset="1" stop-color="#090909"/>
+    </linearGradient>
+    <linearGradient id="paper" x1=".2" y1="0" x2=".83" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#fcfcfc"/>
+      <stop offset=".53" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fafafa"/>
+    </linearGradient>
+    <linearGradient id="bu-face" x1=".14" y1="0" x2=".92" y2=".75" gradientUnits="objectBoundingBox">
+      <stop stop-color="#3c3c3c"/>
+      <stop offset=".35" stop-color="#181818"/>
+      <stop offset=".82" stop-color="#272727"/>
+      <stop offset="1" stop-color="#101010"/>
+    </linearGradient>
+    <linearGradient id="disc-rim" x1=".2" y1="0" x2=".65" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#5b5b5b"/>
+      <stop offset=".30" stop-color="#292929"/>
+      <stop offset=".79" stop-color="#303030"/>
+      <stop offset="1" stop-color="#151515"/>
+    </linearGradient>
+    <radialGradient id="disc-face" cx=".46" cy=".50" r=".54">
+      <stop stop-color="#222"/>
+      <stop offset=".8" stop-color="#1d1d1d"/>
+      <stop offset=".96" stop-color="#171717"/>
+      <stop offset="1" stop-color="#111"/>
+    </radialGradient>
+    <linearGradient id="bai-face" x1="0" y1=".2" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#fff"/>
+      <stop offset=".73" stop-color="#f9f9f9"/>
+      <stop offset="1" stop-color="#e3e3e3"/>
+    </linearGradient>
+    <clipPath id="outer-edge">
+      <rect width="840" height="855" rx="170" ry="176"/>
+    </clipPath>
+    <clipPath id="paper-edge">
+      <rect x="23" y="24" width="794" height="808" rx="147" ry="152"/>
+    </clipPath>
+    <filter id="paper-shadow" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="ink-shadow" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.6"/>
+    </filter>
+    <filter id="raised-shadow" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="4.1"/>
+    </filter>
+    <filter id="matte-grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".45" numOctaves="2" seed="2" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <path id="bu-shape" d="M 255.835 16.267 C 255.010 16.945, 250.361 22.112, 245.506 27.750 L 236.677 38 131.730 38 L 26.783 38 27.400 40.456 C 27.739 41.807, 28.451 44.057, 28.983 45.456 L 29.950 48 88.475 48 C 142.037 48, 147 48.139, 147 49.639 C 147 50.540, 143.497 58.078, 139.215 66.389 C 118.097 107.377, 94.771 138.836, 56.746 177.612 C 48.057 186.473, 36.468 197.498, 30.995 202.112 C 21.691 209.953, 18.825 214, 22.575 214 C 25.255 214, 45.978 203.638, 56.500 197.038 C 82.692 180.606, 110.737 158.387, 127.669 140.652 C 133.263 134.793, 138.395 130, 139.074 130 C 140.048 130, 140.191 145.221, 139.748 202 L 139.188 274 146.344 273.988 C 156.755 273.971, 166.591 270.889, 173.500 265.479 C 175.469 263.937, 175.500 262.724, 175.500 186.095 L 175.500 108.276 178.828 105.164 C 183.310 100.972, 182.752 98.731, 176.988 97.783 C 169.375 96.532, 165.492 95.372, 165.671 94.403 C 165.765 93.893, 169.140 88.503, 173.171 82.424 C 177.202 76.346, 183.425 66.132, 187 59.727 L 193.500 48.080 241.050 48.040 C 276.654 48.010, 288.901 47.699, 289.800 46.800 C 292.134 44.466, 291.171 41.034, 287.589 38.920 C 277 31 266 23 259 16 C 258 15 257 15 255.835 16.267 Z M 188.556 118.910 C 187.569 120.507 188.951 122.421 193.282 125.454 C 216.302 141.575 237.421 163.905 250.071 185.500 C 256.531 196.528 260.325 200.472 265.923 201.979 C 274.593 204.314 282.798 200.784 286.816 192.992 C 292.547 181.877 283.115 163.051 271.928 154.123 C 251 137.312 224 126.397 194 118.573 C 191.122 117.823 189.470 117.708 188.556 118.910 Z" transform="translate(263 91)" fill-rule="evenodd" clip-rule="evenodd"/>
+    <path id="bai-shape" d="M 255 2.500 C 256.292 3.875, 257.495 5, 257.674 5 C 257.853 5, 258 3.875, 258 2.500 C 258 0.457, 257.512 0, 255.326 0 L 252.651 0 255 2.500 M 99.520 12.250 C 99.291 12.938, 97.727 20.925, 96.044 30 C 94.361 39.075, 91.481 52.125, 89.643 59 L 86.303 71.500 69.434 71.775 L 52.565 72.050 44.130 68.427 C 33.646 63.923, 17.376 58, 15.488 58 C 14.277 58, 14.126 73.347, 14.436 165.250 C 14.634 224.238, 14.842 272.902, 14.898 273.393 C 15.055 274.764, 29.874 273.399, 35.500 271.495 C 41.388 269.502, 48.683 265.132, 49.677 263.003 C 50.063 262.176, 50.631 258.125, 50.939 254 L 51.500 246.500 122.250 246.243 L 193 245.987 193 258.386 C 193 268.572, 193.272 270.890, 194.524 271.371 C 197.026 272.331, 217.544 268.399, 222.467 266.016 C 224.979 264.800, 227.505 262.926, 228.080 261.851 C 228.780 260.543, 229.188 231.727, 229.313 174.698 L 229.500 89.500 235.250 86.760 C 240.352 84.328, 241 83.684, 241 81.037 C 241 78.442, 239.605 76.946, 230.250 69.514 C 224.338 64.817, 217.093 59.299, 214.152 57.253 L 208.804 53.533 199.907 62.766 L 191.009 72 146.505 72 C 114.082 72, 102 71.693, 102 70.870 C 102 70.248, 107.847 63.717, 114.994 56.355 C 122.141 48.994, 130.271 40.068, 133.060 36.519 C 137.192 31.260, 138.812 29.943, 141.815 29.403 C 146.242 28.606, 148 27.354, 148 25 C 148 21.805, 145.133 20.749, 123.221 15.873 C 98.461 10.362, 100.068 10.608, 99.520 12.250 M 53.737 83.740 L 50.974 84.135 51.237 118.318 L 51.500 152.500 122 152.500 L 192.500 152.500 192.764 118.567 C 192.969 92.088, 192.750 84.458, 191.764 83.828 C 190.530 83.040, 59.208 82.956, 53.737 83.740 M 51.455 166.258 C 51.189 166.949, 51.091 182.362, 51.236 200.508 L 51.500 233.500 122 233.500 L 192.500 233.500 192.763 199.250 L 193.026 165 122.482 165 C 66.741 165, 51.836 165.264, 51.455 166.258" transform="translate(301 444)" fill-rule="evenodd" clip-rule="evenodd"/>
+    <clipPath id="bu-edge"><use xlink:href="#bu-shape"/></clipPath>
+    <clipPath id="bai-edge"><use xlink:href="#bai-shape"/></clipPath>
+  </defs>
+  <g id="logo" clip-path="url(#outer-edge)">
+    <g id="rounded-frame">
+      <rect width="840" height="855" rx="170" ry="176" fill="url(#frame-rim)"/>
+      <rect x="3" y="5" width="834" height="845" rx="166" ry="170" fill="url(#frame-face)"/>
+    </g>
+    <g id="white-paper" clip-path="url(#paper-edge)">
+      <rect x="23" y="24" width="794" height="808" rx="147" ry="152" fill="url(#paper)"/>
+      <rect x="23" y="24" width="794" height="808" filter="url(#matte-grain)" opacity=".027"/>
+      <rect x="23" y="24" width="794" height="808" rx="147" ry="152" fill="none" stroke="#111" stroke-width="13" opacity=".43" filter="url(#paper-shadow)"/>
+      <rect x="23" y="24" width="794" height="808" rx="147" ry="152" fill="none" stroke="#141414" stroke-width="2" opacity=".37"/>
+    </g>
+    <g id="bu" aria-label="不">
+      <use xlink:href="#bu-shape" fill="#171717" opacity=".33" transform="translate(1 -2)" filter="url(#ink-shadow)"/>
+      <use xlink:href="#bu-shape" fill="#101010"/>
+      <g clip-path="url(#bu-edge)">
+        <use xlink:href="#bu-shape" fill="url(#bu-face)" transform="translate(0 -2.2)"/>
+      </g>
+    </g>
+    <g id="black-disc">
+      <ellipse cx="420" cy="597" rx="201.5" ry="205" fill="#121212" opacity=".35" filter="url(#ink-shadow)" transform="translate(1 -1)"/>
+      <ellipse cx="420" cy="597" rx="201.5" ry="205" fill="url(#disc-rim)"/>
+      <ellipse cx="420" cy="597.7" rx="198.8" ry="202.6" fill="url(#disc-face)"/>
+    </g>
+    <g id="bai" aria-label="白">
+      <use xlink:href="#bai-shape" fill="#080808" transform="translate(-2 3)" filter="url(#raised-shadow)"/>
+      <use xlink:href="#bai-shape" fill="#d2d2d2"/>
+      <g clip-path="url(#bai-edge)">
+        <use xlink:href="#bai-shape" fill="url(#bai-face)" transform="translate(0 -1.5)"/>
+      </g>
+    </g>
+  </g>
+</svg>

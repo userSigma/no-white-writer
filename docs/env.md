@@ -240,3 +240,12 @@ SHA-256：`148E4281F9DD44BC9491B6B0D830F90C50A3B1BF45FC8617B96E8FD2A48625AB`。
 - 移动前一次 `Ctrl+ArrowDown` 未产生可见移动，随后改用真实拖放完成验收；不把该次尝试记为原生组合键通过，也不据此断言业务回归。键盘移动仍由既有组件回归覆盖。
 - 原生输入采用英文文本粘贴，不等于微软／搜狗中文候选窗、中文长句、撤销重做或完整 IME 人工验收；未覆盖多屏、150%／200% DPI、系统文字缩放及完整无障碍读屏矩阵。本轮只闭环 P1 指定主流程，未扩展生产代码或 P2 范围。
 
+## 12. UI review P0/P1 普通启动复验（2026-10-30）
+
+- 开启开发者模式后，当前 `flutter build windows --debug` 构建成功；但直接运行构建目录程序时，用户看到「已经在运行」。检查确认 Debug exe 与父目录仍继承 `Mandatory Label/Low Mandatory Level:(I)(NW)`；开发者模式只解决插件符号链接，不会改变该安全标签。
+- 当前 `InstanceLock.tryAcquire` 将文件访问失败与锁冲突都返回 `false`，因此 Low 进程无法写默认锁文件时会误显示已有实例。这次修正交付入口，不改业务逻辑、不删除锁文件、不降低数据目录权限，也不结束此前已有的六个无窗口进程。
+- 将当前完整 Debug 构建打包并解压到普通 Downloads 目录，全部 **22 个文件**的 SHA-256 与构建源一致。已解压入口：[启动程序](<C:/Users/userSigma/Downloads/no-white-writer-0.4.1-ui-review-debug-windows-x64-20261030-225158/no_white_writer.exe>)；完整包：[Debug ZIP](<../build/packages/no-white-writer-0.4.1-ui-review-debug-windows-x64-20261030-225158.zip>)。必须保留同目录 DLL 和 data，不再使用旧构建目录入口。
+- 无开发环境变量、使用默认 AppData 启动：测试 PID **27324**，令牌完整性 RID **8192（Medium）**，出现可见窗口「不白写作」，日志依次记录 `app.instance.acquired`、`app.instance.held`、`app.exit.requested` 与 `app.exit.accepted`，正常关闭退出码 **0**。stderr 仅有 Impeller 后端说明，无 Dart 异常。
+- 默认作品目录的全部 **8 个文件**启动前后 SHA-256 不变；构建源和解压产物也未改变。见[验证结果](<../build/ui-review-normal-startup-20261030-225158/result.json>)、[生命周期日志](<../build/ui-review-normal-startup-20261030-225158/lifecycle-log.txt>)与[验证脚本](<../build/package-and-verify-ui-review.py>)。
+- 本次仅验证普通启动、锁获取、正常退出与作品文件保护，不冒充原生目录选择器选择／取消或完整中文 IME 人工验收。
+

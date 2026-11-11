@@ -17,6 +17,7 @@ import 'settings_menu.dart';
 import 'shelf_page.dart';
 import 'sidebar_transition.dart';
 import 'theme/tokens.dart';
+import 'window_title_bar.dart';
 
 /// 作品的唯一写作工作区：卷章管理、标题和正文不再分属两个页面。
 class EditorPage extends StatefulWidget {
@@ -235,11 +236,22 @@ class _EditorPageState extends State<EditorPage> {
           return Container(
             color: paperOrInk(context),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                _topBar(context, wide),
-                Container(height: 1, color: hairlineColor(context)),
-                Expanded(child: _body(context, constraints, wide, collapsed)),
+              children: [
+                WindowTitleBar(
+                  platform: widget.app.platform,
+                  leading: _navigation(
+                    context,
+                    wide,
+                    inPane: !wide && _paneOpen,
+                  ),
+                  actions: _saveStatus(context),
+                ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, bodyConstraints) =>
+                        _body(context, bodyConstraints, wide, collapsed),
+                  ),
+                ),
               ],
             ),
           );
@@ -256,14 +268,6 @@ class _EditorPageState extends State<EditorPage> {
         padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Row(
           children: <Widget>[
-            Tooltip(
-              message: '返回作品列表',
-              child: IconButton(
-                key: const ValueKey('back-to-shelf'),
-                icon: const Icon(FluentIcons.back),
-                onPressed: blocked ? null : _back,
-              ),
-            ),
             const Spacer(),
             SettingsMenuButton(
               app: widget.app,
@@ -400,7 +404,45 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  Widget _topBar(BuildContext context, bool wide) {
+  Widget _navigation(BuildContext context, bool wide, {bool inPane = false}) {
+    final blocked = workspace.editingLocked || _paneDraft.value;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: wide
+              ? (widget.app.settings.settings.sidebarCollapsed
+                    ? '展开目录侧栏'
+                    : '收起目录侧栏')
+              : (inPane ? '关闭目录' : '打开目录'),
+          child: IconButton(
+            key: ValueKey(
+              wide
+                  ? 'toggle-sidebar'
+                  : (inPane ? 'close-chapter-pane' : 'open-chapter-pane'),
+            ),
+            icon: Icon(wide ? FluentIcons.side_panel : FluentIcons.list),
+            onPressed: blocked
+                ? null
+                : (wide ? _toggleSidebar : (inPane ? _closePane : _openPane)),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: '返回作品列表',
+          child: IconButton(
+            key: ValueKey(
+              inPane && !wide ? 'pane-back-to-shelf' : 'back-to-shelf',
+            ),
+            icon: const Icon(FluentIcons.back),
+            onPressed: blocked ? null : _back,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _saveStatus(BuildContext context) {
     final Color dot = switch (editor.state) {
       SaveState.clean => const Color(0xFF5C8A57),
       SaveState.saving => accentSoftColor(context),
@@ -409,42 +451,12 @@ class _EditorPageState extends State<EditorPage> {
       SaveState.blocked => mutedTextColor(context),
     };
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
+      key: const ValueKey('editor-save-status'),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: <Widget>[
-          if (wide)
-            Tooltip(
-              message: widget.app.settings.settings.sidebarCollapsed
-                  ? '展开目录侧栏'
-                  : '收起目录侧栏',
-              child: IconButton(
-                key: const ValueKey('toggle-sidebar'),
-                icon: const Icon(FluentIcons.side_panel),
-                onPressed: workspace.editingLocked || _paneDraft.value
-                    ? null
-                    : _toggleSidebar,
-              ),
-            ),
-          if (!wide)
-            IconButton(
-              key: const ValueKey('open-chapter-pane'),
-              icon: const Icon(FluentIcons.list),
-              onPressed: workspace.editingLocked ? null : _openPane,
-            ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              widget.book.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: bodyTextColor(context),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
           Container(
             width: 7,
             height: 7,
@@ -542,13 +554,6 @@ class _EditorPageState extends State<EditorPage> {
                                   color: bodyTextColor(context),
                                 ),
                               ),
-                            Text(
-                              '章节标题',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: mutedTextColor(context),
-                              ),
-                            ),
                             const SizedBox(height: 8),
                             TextField(
                               key: const ValueKey('chapter-title'),

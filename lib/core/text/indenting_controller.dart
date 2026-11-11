@@ -1,28 +1,84 @@
-import 'package:flutter/services.dart' show TextEditingValue;
-
+import 'package:flutter/services.dart' show TextEditingValue, TextRange;
 import 'package:flutter/widgets.dart' show TextEditingController;
 
+import 'composing.dart';
 import 'indent_rules.dart';
 
-/// 在 controller 层实现回车自动缩进（PLAN.md Q27 / §8.1）：把修正后的 value
-/// 一次性写回，避免 TextInputFormatter 在 IME 组合态下反复改写导致丢字。
+/// Paragraph whitespace is applied as one controller transaction, with selection
+/// offsets mapped by TextEditingValue.replaced. Never rewrite an IME draft.
 class IndentingTextEditingController extends TextEditingController {
   IndentingTextEditingController({
     required this.autoIndent,
     required this.blankLineBetween,
-  });
+  }) : _indent = autoIndent(),
+       _blank = blankLineBetween();
 
   final bool Function() autoIndent;
   final bool Function() blankLineBetween;
+  bool _indent;
+  bool _blank;
+
+  void refreshParagraphStyle() {
+    if (_indent != autoIndent() || _blank != blankLineBetween()) {
+      value = value;
+    }
+  }
 
   @override
   set value(TextEditingValue newValue) {
-    final TextEditingValue oldValue = super.value;
-    super.value = applyEnterIndent(
-      oldValue,
+    if (isComposingValue(newValue)) {
+      super.value = newValue;
+      return;
+    }
+    final bool indent = autoIndent(), blank = blankLineBetween();
+    TextEditingValue formatted = applyEnterIndent(
+      super.value,
       newValue,
-      autoIndent: autoIndent(),
-      blankLineBetween: blankLineBetween(),
+      autoIndent: indent,
+      blankLineBetween: blank,
     );
+    // Remove only the conventional formatting when its preference is disabled.
+    if (_indent && !indent) {
+      formatted = _replaceMatches(
+        formatted,
+        RegExp(r'^　　', multiLine: true),
+        '',
+      );
+    }
+    if (_blank && !blank) {
+      formatted = _replaceMatches(formatted, RegExp(r'\n\n(?=[^\n])'), '\n');
+    }
+    if (indent) {
+      formatted = _replaceMatches(
+        formatted,
+        RegExp(r'^(?!　　)(?=[^\s])', multiLine: true),
+        kIndent,
+      );
+    }
+    if (blank) {
+      formatted = _replaceMatches(
+        formatted,
+        RegExp(r'(?<=[^\n])\n(?=[^\n])'),
+        '\n\n',
+      );
+    }
+    _indent = indent;
+    _blank = blank;
+    super.value = formatted;
+  }
+
+  TextEditingValue _replaceMatches(
+    TextEditingValue input,
+    RegExp pattern,
+    String replacement,
+  ) {
+    TextEditingValue result = input;
+    for (final match in pattern.allMatches(input.text).toList().reversed) {
+      result = result.replaced(
+        TextRange(start: match.start, end: match.end),
+        replacement,
+      );
+    }
+    return result;
   }
 }

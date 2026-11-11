@@ -1,5 +1,6 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/state/library_controller.dart';
@@ -9,6 +10,7 @@ import 'package:no_white_writer/ui/shelf_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 
 void expectBorderless(Button button) {
   for (final states in <Set<WidgetState>>[
@@ -24,7 +26,85 @@ void expectBorderless(Button button) {
   }
 }
 
+void expectLabelCentered(WidgetTester tester, String label) {
+  final text = find.text(label);
+  final paragraph = tester.renderObject<RenderParagraph>(text);
+  final boxes = paragraph.getBoxesForSelection(
+    TextSelection(baseOffset: 0, extentOffset: label.length),
+  );
+  expect(boxes, hasLength(1));
+  final paintedCenter = paragraph.localToGlobal(boxes.single.toRect().center);
+  final row = find.ancestor(of: text, matching: find.byType(Button)).first;
+  expect(
+    paintedCenter.dx,
+    closeTo(tester.getCenter(row).dx, 0.5),
+    reason: '$label 的实际文字应居中于整行，而不是偏向标记预留位另一侧',
+  );
+}
+
 void main() {
+  for (final brightness in Brightness.values) {
+    for (final dpi in [1.0, 1.25]) {
+      testWidgets('菜单文字按整行居中 $brightness DPI $dpi', (tester) async {
+        final h = await widgetHarness(tester);
+        tester.view.devicePixelRatio = dpi;
+        String? choice;
+        await tester.pumpWidget(
+          FluentApp(
+            theme: buildFluentTheme(AppThemeData.builtinFor(brightness)),
+            home: Builder(
+              builder: (context) => Button(
+                onPressed: () async {
+                  choice = await showContextMenu(
+                    context,
+                    const Offset(100, 100),
+                    const [
+                      MenuAction('rename', '重命名章'),
+                      MenuAction('move', '移动'),
+                      MenuAction('export', '导出本章'),
+                      MenuAction('delete', '删除章'),
+                      MenuAction('checked', '已选项目', checked: true),
+                      MenuAction('disabled', '禁用项目', enabled: false),
+                      MenuAction(
+                        'parent',
+                        '更多操作',
+                        children: [MenuAction('child', '子菜单动作')],
+                      ),
+                    ],
+                  );
+                },
+                child: const Text('打开菜单'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('打开菜单'));
+        await tester.pumpAndSettle();
+        for (final label in [
+          '重命名章',
+          '移动',
+          '导出本章',
+          '删除章',
+          '已选项目',
+          '禁用项目',
+          '更多操作',
+        ]) {
+          expectLabelCentered(tester, label);
+        }
+        expect(find.byIcon(FluentIcons.check_mark), findsOneWidget);
+        expect(find.byIcon(FluentIcons.chevron_right), findsOneWidget);
+        await tester.tap(find.text('更多操作'));
+        await tester.pumpAndSettle();
+        expectLabelCentered(tester, '子菜单动作');
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(choice, 'child');
+        expect(find.byKey(const ValueKey('context-menu')), findsNothing);
+        await finishWidget(tester, h);
+      });
+    }
+  }
+
   for (final brightness in Brightness.values) {
     for (final width in [1280.0, 900.0]) {
       testWidgets('真实书架右键菜单无容器与项目描边 $brightness $width', (tester) async {
@@ -104,7 +184,10 @@ void main() {
           find.byKey(ValueKey('chapter-row-${chapter.id}')),
         );
         expect(row.color, isNotNull);
-        await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+        await tapWithMouse(
+          tester,
+          find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+        );
         await tester.pumpAndSettle();
         expect(find.text('重命名章'), findsOneWidget);
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -234,7 +317,7 @@ void main() {
     }))!;
     await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(ValueKey('book-menu-${target.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('book-menu-${target.id}')));
     await tester.pumpAndSettle();
     h.app.library.setSort(LibrarySort.title);
     await tester.pump();

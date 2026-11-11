@@ -53,6 +53,18 @@ jobs:
       - name: 构建 Windows x64 release
         run: flutter build windows --release
 
+      - name: 准备 Inno Setup 编译器
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe") -and
+              -not (Test-Path "$env:ProgramFiles/Inno Setup 6/ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup 安装失败：$LASTEXITCODE" }
+          }
+
+      - name: 编译每用户安装包并计算 SHA-256
+        run: dart run tool/build_windows_installer.dart --skip-build
+
       - name: 打包 ZIP 并计算 SHA-256
         shell: pwsh
         run: |
@@ -76,5 +88,6 @@ jobs:
         with:
           files: |
             build/packages/*.zip
+            build/packages/*-setup.exe
             build/packages/*.sha256
           generate_release_notes: true

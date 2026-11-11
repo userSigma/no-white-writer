@@ -108,9 +108,9 @@ void main() {
         .toList();
     debugPrint('SHELF TEXTS: $texts');
     expect(
-      texts.any((String? t) => t != null && t.contains('本 ·')),
+      texts.any((String? t) => t != null && t.contains('部作品 · 累计')),
       isTrue,
-      reason: '头部应显示「N 本 · 排序」副标题',
+      reason: '头部应显示作品总数及累计字数，不重复排序说明',
     );
     expect(tester.takeException(), isNull);
   });

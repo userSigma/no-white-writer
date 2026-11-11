@@ -11,6 +11,7 @@ import 'package:no_white_writer/state/workspace_controller.dart';
 
 import 'support/app_harness.dart';
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 
 class _FailIndexWriter extends AtomicFileWriter {
   bool fail = false;
@@ -163,7 +164,7 @@ void main() {
     });
   }
 
-  for (final action in ['create', 'menu', 'settings']) {
+  for (final action in ['create', 'tile', 'menu', 'settings']) {
     testWidgets('在途导出时书架 $action 不可操作，完成后恢复', (tester) async {
       final entered = Completer<void>();
       final release = Completer<void>();
@@ -196,14 +197,20 @@ void main() {
             matching: find.byType(FilledButton),
           );
           expect(tester.widget<FilledButton>(button).onPressed, isNull);
+        } else if (action == 'tile') {
+          final tile = find.byKey(const ValueKey('shelf-new-book-tile'));
+          expect(tester.widget<Button>(tile).onPressed, isNull);
+          await tester.tap(tile);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('book-title-input')), findsNothing);
         } else if (action == 'settings') {
-          final button = find.descendant(
-            of: find.byTooltip('设置'),
-            matching: find.byType(IconButton),
-          );
-          expect(tester.widget<IconButton>(button).onPressed, isNull);
+          final button = find.byKey(const ValueKey('settings-button'));
+          expect(tester.widget<Button>(button).onPressed, isNull);
         } else {
-          await tester.tap(find.byKey(ValueKey('book-menu-${book.id}')));
+          await tapWithMouse(
+            tester,
+            find.byKey(ValueKey('book-menu-${book.id}')),
+          );
           await tester.pumpAndSettle();
           expect(find.text('编辑信息'), findsNothing);
         }
@@ -217,6 +224,9 @@ void main() {
           matching: find.byType(FilledButton),
         );
         expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
+      } else if (action == 'tile') {
+        final tile = find.byKey(const ValueKey('shelf-new-book-tile'));
+        expect(tester.widget<Button>(tile).onPressed, isNotNull);
       }
       await finishWidget(tester, h);
     });

@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../app_context.dart';
 import '../core/i18n/i18n.dart';
 import '../core/models.dart';
-import '../core/text/composing.dart';
 import '../state/settings_controller.dart';
 import 'theme/tokens.dart';
 
@@ -20,9 +19,11 @@ class SettingsMenuButton extends StatefulWidget {
     required this.app,
     this.enabled = true,
     this.beforeOpen,
+    this.secondary = false,
   });
   final AppContext app;
   final bool enabled;
+  final bool secondary;
   final Future<bool> Function()? beforeOpen;
   @override
   State<SettingsMenuButton> createState() => SettingsMenuButtonState();
@@ -61,19 +62,32 @@ class SettingsMenuButtonState extends State<SettingsMenuButton> {
   }
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: t(context, 'settings.title'),
-    child: IconButton(
-      key: const ValueKey('settings-button'),
-      icon: const Icon(FluentIcons.settings),
-      onPressed:
-          widget.enabled &&
-              !widget.app.exporter.busy &&
-              !widget.app.editor.isComposing
-          ? _open
-          : null,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final onPressed =
+        widget.enabled &&
+            !widget.app.exporter.busy &&
+            !widget.app.editor.isComposing
+        ? _open
+        : null;
+    return Tooltip(
+      message: t(context, 'settings.title'),
+      child: widget.secondary
+          ? Button(
+              key: const ValueKey('settings-button'),
+              onPressed: onPressed,
+              child: const SizedBox(
+                width: 16,
+                height: 20,
+                child: Center(child: Icon(FluentIcons.settings, size: 16)),
+              ),
+            )
+          : IconButton(
+              key: const ValueKey('settings-button'),
+              icon: const Icon(FluentIcons.settings),
+              onPressed: onPressed,
+            ),
+    );
+  }
 }
 
 class _SettingsDialog extends StatefulWidget {
@@ -93,22 +107,22 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   String? _message;
   bool _messageError = false;
   AppContext get app => widget.app;
-  bool get _composing => isComposingValue(_path.value);
-  bool get _dirty =>
-      _path.text.trim() != (app.settings.settings.exportDirectory ?? '');
 
   @override
   void initState() {
     super.initState();
     _path = TextEditingController(
-      text: app.settings.settings.exportDirectory ?? '',
-    )..addListener(_refresh);
+      text: app.paths.exportRoot(app.settings.settings.exportDirectory),
+    );
     app.settings.addListener(_refresh);
     _guard = app.registerUiGuard(_prepareClose);
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final path = app.paths.exportRoot(app.settings.settings.exportDirectory);
+    if (_path.text != path) _path.text = path;
+    setState(() {});
   }
 
   /// Esc 关闭浮窗（确认框打开时交还给确认框自己）。
@@ -134,30 +148,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   }
 
   Future<bool> _prepareClose() async {
-    if (_working || _composing || _confirming) return false;
-    if (_dirty) {
-      _confirming = true;
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (context) => ContentDialog(
-          title: Text(t(context, 'settings.exportDir.confirm.title')),
-          content: Text(t(context, 'settings.exportDir.confirm.body')),
-          actions: [
-            Button(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(t(context, 'settings.exportDir.confirm.keep')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(t(context, 'settings.exportDir.confirm.discard')),
-            ),
-          ],
-        ),
-      );
-      _confirming = false;
-      if (!mounted || discard != true) return false;
-      _path.text = app.settings.settings.exportDirectory ?? '';
-    }
+    if (_working || _confirming) return false;
     try {
       await app.settings.flush();
       return true;
@@ -183,33 +174,37 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     }
   }
 
-  Future<void> _savePath({bool useDefault = false}) async {
-    if (_working || _composing) return;
+  Future<void> _changePath({bool useDefault = false}) async {
+    if (_working || _confirming) return;
     setState(() {
       _working = true;
       _message = null;
     });
-    final previous = app.settings.settings.exportDirectory;
-    if (useDefault) _path.text = '';
-    final String text = _path.text.trim();
-    app.settings.setExportDirectory(text.isEmpty ? null : text);
     try {
+      final selected = useDefault
+          ? null
+          : await app.platform.selectDirectory(
+              initialDirectory: app.paths.exportRoot(
+                app.settings.settings.exportDirectory,
+              ),
+            );
+      if (!mounted || (!useDefault && selected == null)) return;
+      app.settings.setExportDirectory(selected);
+      // 保留尚未落盘的选择，由设置控制器的错误状态及重试按钮负责恢复。
       await app.settings.flush();
       if (!mounted) return;
       _notice(t(context, 'settings.exportDir.saved'));
     } catch (error) {
-      // Restore only the confirmed preference; keep the failed input for retry.
-      // 失败详情交给浮窗内的红字（settings-save-error）与「重试保存」按钮，
-      // 不再额外弹 InfoBar，避免通知层遮住重试按钮。
-      app.settings.settings.exportDirectory = previous;
-      if (!mounted) return;
+      if (mounted && app.settings.saveError == null) {
+        _notice('$error', error: true);
+      }
     } finally {
       if (mounted) setState(() => _working = false);
     }
   }
 
   Future<void> _openDirectory(String path) async {
-    if (_working || _composing) return;
+    if (_working) return;
     setState(() => _working = true);
     try {
       final opened = await app.platform.revealInFileManager(path);
@@ -309,19 +304,27 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   Widget _row(String label, Widget control) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 7),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: <Widget>[
-        SizedBox(
-          width: 96,
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 13, color: bodyTextColor(context)),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: control),
-      ],
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final title = Text(
+          label,
+          style: TextStyle(fontSize: 13, color: bodyTextColor(context)),
+        );
+        if (constraints.maxWidth < 400) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[title, const SizedBox(height: 8), control],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SizedBox(width: 96, child: title),
+            const SizedBox(width: 12),
+            Expanded(child: control),
+          ],
+        );
+      },
     ),
   );
 
@@ -338,12 +341,13 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     Key? comboKey,
   }) => ComboBox<double>(
     key: comboKey,
+    isExpanded: true,
     value: value,
     items: <ComboBoxItem<double>>[
       for (final double v in values)
         ComboBoxItem<double>(value: v, child: Text(label(v))),
     ],
-    onChanged: _working || _composing ? null : onChanged,
+    onChanged: _working ? null : onChanged,
   );
 
   @override
@@ -370,15 +374,36 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         onKeyEvent: _key,
         child: ContentDialog(
           key: const ValueKey('settings-menu'),
-          title: Text(
-            t(context, 'settings.title'),
-            style: const TextStyle(
-              color: AppColors.cinnabar,
-              fontWeight: FontWeight.w600,
-            ),
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 756),
+          style: const ContentDialogThemeData(
+            padding: EdgeInsetsDirectional.fromSTEB(24, 20, 24, 20),
+            actionsPadding: EdgeInsetsDirectional.fromSTEB(24, 16, 24, 16),
+          ),
+          title: Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  t(context, 'settings.title'),
+                  style: TextStyle(
+                    color: accentColor(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Tooltip(
+                message: t(context, 'common.close'),
+                child: IconButton(
+                  key: const ValueKey('settings-close'),
+                  icon: const Icon(FluentIcons.chrome_close, size: 14),
+                  onPressed: _working || _confirming
+                      ? null
+                      : () => unawaited(requestClose()),
+                ),
+              ),
+            ],
           ),
           content: SizedBox(
-            width: 500,
+            width: 560,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -388,6 +413,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     t(context, 'settings.language'),
                     ComboBox<String>(
                       key: const ValueKey('settings-language'),
+                      isExpanded: true,
                       value: packs.any((p) => p.code == app.i18n.currentCode)
                           ? app.i18n.currentCode
                           : null,
@@ -410,60 +436,64 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        ComboBox<String>(
-                          key: const ValueKey('settings-theme'),
-                          value:
-                              themeEntries.any(
-                                (e) => e.$1 == settings.themeMode,
-                              )
-                              ? settings.themeMode
-                              : null,
-                          items: <ComboBoxItem<String>>[
-                            for (final entry in themeEntries)
-                              ComboBoxItem<String>(
-                                value: entry.$1,
-                                child: Text(entry.$2),
-                              ),
-                          ],
-                          onChanged: _working || _composing
-                              ? null
-                              : (mode) {
-                                  if (mode != null) {
-                                    app.settings.setThemeMode(mode);
-                                  }
-                                },
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Button(
-                              onPressed:
-                                  _working ||
-                                      _composing ||
-                                      settings.customThemes.length >=
-                                          SettingsController.customThemeLimit
-                                  ? null
-                                  : () => unawaited(_createCustomTheme()),
-                              child: Text(
-                                t(context, 'settings.theme.newCustom'),
+                            Expanded(
+                              child: ComboBox<String>(
+                                key: const ValueKey('settings-theme'),
+                                isExpanded: true,
+                                value:
+                                    themeEntries.any(
+                                      (e) => e.$1 == settings.themeMode,
+                                    )
+                                    ? settings.themeMode
+                                    : null,
+                                items: <ComboBoxItem<String>>[
+                                  for (final entry in themeEntries)
+                                    ComboBoxItem<String>(
+                                      value: entry.$1,
+                                      child: Text(entry.$2),
+                                    ),
+                                ],
+                                onChanged: _working
+                                    ? null
+                                    : (mode) {
+                                        if (mode != null) {
+                                          app.settings.setThemeMode(mode);
+                                        }
+                                      },
                               ),
                             ),
-                            if (settings.customThemes.isNotEmpty)
-                              Button(
-                                onPressed: _working || _composing
+                            const SizedBox(width: 8),
+                            Tooltip(
+                              message: t(context, 'settings.theme.manage'),
+                              child: Button(
+                                key: const ValueKey('settings-theme-manage'),
+                                onPressed: _working
                                     ? null
                                     : () => setState(
                                         () => _manageOpen = !_manageOpen,
                                       ),
                                 child: Text(
-                                  t(context, 'settings.theme.manage'),
+                                  t(context, 'settings.theme.manage.short'),
                                 ),
                               ),
+                            ),
                           ],
                         ),
                         if (_manageOpen) ...<Widget>[
+                          const SizedBox(height: 8),
+                          Button(
+                            key: const ValueKey('settings-theme-create'),
+                            onPressed:
+                                _working ||
+                                    settings.customThemes.length >=
+                                        SettingsController.customThemeLimit
+                                ? null
+                                : () => unawaited(_createCustomTheme()),
+                            child: Text(t(context, 'settings.theme.newCustom')),
+                          ),
                           const SizedBox(height: 8),
                           for (final CustomTheme theme in settings.customThemes)
                             Padding(
@@ -475,7 +505,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                     key: ValueKey(
                                       'custom-theme-rename-${theme.id}',
                                     ),
-                                    onPressed: _working || _composing
+                                    onPressed: _working
                                         ? null
                                         : () => unawaited(
                                             _renameCustomTheme(theme),
@@ -487,7 +517,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                     key: ValueKey(
                                       'custom-theme-delete-${theme.id}',
                                     ),
-                                    onPressed: _working || _composing
+                                    onPressed: _working
                                         ? null
                                         : () => unawaited(
                                             _deleteCustomTheme(theme),
@@ -510,7 +540,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                           ? settings.fontSize
                           : null,
                       values: fontSizes,
-                      label: (v) => v.toInt().toString(),
+                      label: (v) => t(context, 'settings.fontSize.value', {
+                        'value': v.toInt().toString(),
+                      }),
                       onChanged: (value) {
                         if (value != null) app.settings.setFontSize(value);
                       },
@@ -524,7 +556,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                           ? settings.lineHeight
                           : null,
                       values: lineHeights,
-                      label: (v) => v.toStringAsFixed(1),
+                      label: (v) => t(context, 'settings.lineHeight.value', {
+                        'value': v.toStringAsFixed(1),
+                      }),
                       onChanged: (value) {
                         if (value != null) app.settings.setLineHeight(value);
                       },
@@ -537,9 +571,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       child: ToggleSwitch(
                         key: const ValueKey('settings-auto-indent'),
                         checked: settings.autoIndent,
-                        onChanged: _working || _composing
-                            ? null
-                            : app.settings.setAutoIndent,
+                        onChanged: _working ? null : app.settings.setAutoIndent,
                       ),
                     ),
                   ),
@@ -550,7 +582,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       child: ToggleSwitch(
                         key: const ValueKey('settings-blank-line'),
                         checked: settings.blankLineBetween,
-                        onChanged: _working || _composing
+                        onChanged: _working
                             ? null
                             : app.settings.setBlankLineBetween,
                       ),
@@ -562,15 +594,31 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        TextBox(
-                          key: const ValueKey('settings-export-path'),
-                          controller: _path,
-                          enabled: !_working,
-                          placeholder: t(context, 'settings.exportDir.hint'),
-                          onEditingComplete: () {},
-                          onSubmitted: (_) {
-                            if (!_composing) unawaited(_savePath());
-                          },
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Expanded(
+                              child: TextBox(
+                                key: const ValueKey('settings-export-path'),
+                                controller: _path,
+                                readOnly: true,
+                                maxLines: 2,
+                                minLines: 1,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Button(
+                              key: const ValueKey(
+                                'settings-change-export-path',
+                              ),
+                              onPressed: _working
+                                  ? null
+                                  : () => unawaited(_changePath()),
+                              child: Text(
+                                t(context, 'settings.exportDir.change'),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Wrap(
@@ -578,34 +626,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                           runSpacing: 8,
                           children: <Widget>[
                             Button(
-                              onPressed: _working || _composing
-                                  ? null
-                                  : () => unawaited(_savePath()),
-                              child: Text(t(context, 'common.save')),
-                            ),
-                            Button(
-                              onPressed: _working || _composing
-                                  ? null
-                                  : () =>
-                                        unawaited(_savePath(useDefault: true)),
-                              child: Text(
-                                t(context, 'settings.exportDir.reset'),
-                              ),
-                            ),
-                            Button(
-                              onPressed: _working || _composing
+                              onPressed: _working
                                   ? null
                                   : () {
-                                      if (_dirty) {
-                                        _notice(
-                                          t(
-                                            context,
-                                            'settings.exportDir.pending',
-                                          ),
-                                          error: true,
-                                        );
-                                        return;
-                                      }
                                       unawaited(
                                         _openDirectory(
                                           app.paths.exportRoot(
@@ -618,13 +641,24 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                 t(context, 'settings.exportDir.open'),
                               ),
                             ),
+                            Button(
+                              onPressed: _working
+                                  ? null
+                                  : () => unawaited(
+                                      _changePath(useDefault: true),
+                                    ),
+                              child: Text(
+                                t(context, 'settings.exportDir.reset'),
+                              ),
+                            ),
                           ],
                         ),
                       ],
                     ),
                   ),
+                  _divider(),
                   _row(
-                    '',
+                    t(context, 'settings.systemDir'),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -681,13 +715,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     ),
                     const SizedBox(height: 4),
                     Button(
-                      onPressed: _working || _composing
+                      onPressed: _working
                           ? null
                           : () async {
-                              if (_dirty) {
-                                await _savePath();
-                                return;
-                              }
                               try {
                                 await app.settings.flush();
                                 if (!context.mounted) return;
@@ -721,11 +751,12 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             ),
           ),
           actions: <Widget>[
-            FilledButton(
-              onPressed: _working || _composing || _confirming
+            Button(
+              key: const ValueKey('settings-done'),
+              onPressed: _working || _confirming
                   ? null
                   : () => unawaited(requestClose()),
-              child: Text(t(context, 'common.close')),
+              child: Text(t(context, 'settings.done')),
             ),
           ],
         ),
@@ -737,7 +768,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   void dispose() {
     app.removeUiGuard(_guard);
     app.settings.removeListener(_refresh);
-    _path.removeListener(_refresh);
     _path.dispose();
     super.dispose();
   }

@@ -7,6 +7,7 @@ import '../core/text/word_count.dart';
 import '../state/export_controller.dart';
 import '../state/workspace_controller.dart';
 import 'menu_surface.dart';
+import 'hover_actions.dart';
 import 'chapter_catalog_menus.dart';
 import 'chapter_drag_interaction.dart';
 import 'chapter_volume_name_editor.dart';
@@ -209,6 +210,25 @@ class _ChapterPaneState extends State<ChapterPane> {
             _volume(context, book.volumes[i]),
             if (w.moveMode == MoveMode.volumes) _drag.gap(context, null, i + 1),
           ],
+          const SizedBox(height: 8),
+          Button(
+            key: const ValueKey('add-volume'),
+            onPressed:
+                w.editingLocked ||
+                    w.moving ||
+                    _editingId != null ||
+                    w.editor.isComposing
+                ? null
+                : () => _menus.appendVolume(context),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(FluentIcons.add, size: 12),
+                const SizedBox(width: 6),
+                Text(t(context, 'sidebar.newVolume')),
+              ],
+            ),
+          ),
         ],
       ),
     ),
@@ -230,62 +250,80 @@ class _ChapterPaneState extends State<ChapterPane> {
               context,
               volume,
               null,
-              ColoredBox(
-                color: FluentTheme.of(context)
-                    .resources
-                    .subtleFillColorSecondary,
-                child: Row(
-                  children: [
-                    Tooltip(
-                      message: open
-                          ? t(context, 'sidebar.collapseVolume')
-                          : t(context, 'sidebar.expandVolume'),
-                      child: IconButton(
-                        key: ValueKey('toggle-volume-${volume.id}'),
-                        icon: Icon(
-                          open
-                              ? FluentIcons.chevron_down
-                              : FluentIcons.chevron_right,
-                          size: 12,
+              HoverActionRegion(
+                child: ColoredBox(
+                  color: FluentTheme.of(context)
+                      .resources
+                      .subtleFillColorSecondary,
+                  child: Row(
+                    children: [
+                      Tooltip(
+                        message: open
+                            ? t(context, 'sidebar.collapseVolume')
+                            : t(context, 'sidebar.expandVolume'),
+                        child: IconButton(
+                          key: ValueKey('toggle-volume-${volume.id}'),
+                          icon: Icon(
+                            open
+                                ? FluentIcons.chevron_down
+                                : FluentIcons.chevron_right,
+                            size: 12,
+                          ),
+                          onPressed: w.editingLocked || _editingId != null
+                              ? null
+                              : () => _toggle(volume),
                         ),
-                        onPressed: w.editingLocked || _editingId != null
-                            ? null
-                            : () => _toggle(volume),
                       ),
-                    ),
-                    Expanded(
-                      child: _editingId == volume.id
-                          ? ChapterVolumeNameField(
-                              editor: _nameEditor,
-                              volumeId: volume.id,
-                            )
-                          : Text(
-                              displayVolumeTitle(
-                                volume,
-                                untitledLabel: t(
-                                  context,
-                                  'common.untitledVolume',
+                      Expanded(
+                        child: _editingId == volume.id
+                            ? ChapterVolumeNameField(
+                                editor: _nameEditor,
+                                volumeId: volume.id,
+                              )
+                            : Text(
+                                displayVolumeTitle(
+                                  volume,
+                                  untitledLabel: t(
+                                    context,
+                                    'common.untitledVolume',
+                                  ),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: volume.title.trim().isEmpty
+                                      ? mutedTextColor(context)
+                                      : null,
                                 ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: volume.title.trim().isEmpty
-                                    ? mutedTextColor(context)
-                                    : null,
-                              ),
-                            ),
-                    ),
-                    if (w.moveMode == MoveMode.volumes)
-                      _drag.grip(context, volume, null)
-                    else
-                      _menuButton(
-                        'volume-menu-${volume.id}',
-                        (p) => _menus.volumeMenu(context, volume, p),
                       ),
-                  ],
+                      HoverAction(
+                        child: Tooltip(
+                          message: t(context, 'sidebar.newChapter'),
+                          child: IconButton(
+                            key: ValueKey('add-chapter-${volume.id}'),
+                            icon: const Icon(FluentIcons.add, size: 12),
+                            onPressed:
+                                w.editingLocked ||
+                                    w.moving ||
+                                    _editingId != null ||
+                                    w.editor.isComposing
+                                ? null
+                                : () => _menus.appendChapter(volume),
+                          ),
+                        ),
+                      ),
+                      if (w.moveMode == MoveMode.volumes)
+                        _drag.grip(context, volume, null)
+                      else
+                        _menuButton(
+                          'volume-menu-${volume.id}',
+                          (p) => _menus.volumeMenu(context, volume, p),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -297,124 +335,116 @@ class _ChapterPaneState extends State<ChapterPane> {
               if (w.moveMode == MoveMode.chapters)
                 _drag.gap(context, volume, i + 1),
             ],
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Align(
-                alignment: Alignment.center,
-                child: Tooltip(
-                  message: t(context, 'sidebar.newChapter'),
-                  child: Semantics(
-                    label: t(context, 'sidebar.newChapter'),
-                    button: true,
-                    child: IconButton(
-                      key: ValueKey('add-chapter-${volume.id}'),
-                      icon: const Icon(FluentIcons.add),
-                      onPressed:
-                          w.editingLocked || w.moving || _editingId != null
-                          ? null
-                          : () => _menus.appendChapter(volume),
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _menuButton(String key, ValueChanged<Offset> action) => Builder(
-    builder: (context) => IconButton(
-      key: ValueKey(key),
-      icon: const Icon(FluentIcons.more, size: 14),
-      onPressed:
-          w.editingLocked || w.moving || w.editor.isComposing || _composing
-          ? null
-          : () {
-              final box = context.findRenderObject()! as RenderBox;
-              action(box.localToGlobal(Offset(0, box.size.height)));
-            },
+  Widget _menuButton(String key, ValueChanged<Offset> action) => HoverAction(
+    child: SizedBox.square(
+      dimension: 28,
+      child: Builder(
+        builder: (context) => IconButton(
+          key: ValueKey(key),
+          icon: const Icon(FluentIcons.more, size: 14),
+          onPressed:
+              w.editingLocked || w.moving || w.editor.isComposing || _composing
+              ? null
+              : () {
+                  final box = context.findRenderObject()! as RenderBox;
+                  action(box.localToGlobal(Offset(0, box.size.height)));
+                },
+        ),
+      ),
     ),
   );
   Widget _chapter(BuildContext context, Volume volume, ChapterMeta chapter) {
     final active = w.chapter?.id == chapter.id, fg = bodyTextColor(context);
-    return GestureDetector(
-      onSecondaryTapDown: (d) =>
-          _menus.chapterMenu(context, volume, chapter, d.globalPosition),
-      onLongPressStart: (d) =>
-          _menus.chapterMenu(context, volume, chapter, d.globalPosition),
-      child: Container(
-        key: ValueKey('chapter-row-${chapter.id}'),
-        color: active ? accentColor(context).withValues(alpha: 0.08) : null,
-        child: Row(
-          children: [
-            Expanded(
-              child: Button(
-                key: ValueKey('select-chapter-${chapter.id}'),
-                style:
-                    borderlessRowStyle(
-                      background: Colors.transparent,
-                      foreground: active ? accentColor(context) : fg,
-                    ).copyWith(
-                      padding: const WidgetStatePropertyAll(
-                        EdgeInsets.fromLTRB(18, 10, 10, 10),
+    return HoverActionRegion(
+      child: GestureDetector(
+        onSecondaryTapDown: (d) =>
+            _menus.chapterMenu(context, volume, chapter, d.globalPosition),
+        onLongPressStart: (d) =>
+            _menus.chapterMenu(context, volume, chapter, d.globalPosition),
+        child: Container(
+          key: ValueKey('chapter-row-${chapter.id}'),
+          height: 34,
+          color: active ? accentColor(context).withValues(alpha: 0.08) : null,
+          child: Row(
+            children: [
+              Expanded(
+                child: Button(
+                  key: ValueKey('select-chapter-${chapter.id}'),
+                  style:
+                      borderlessRowStyle(
+                        background: Colors.transparent,
+                        foreground: active ? accentColor(context) : fg,
+                      ).copyWith(
+                        padding: const WidgetStatePropertyAll(
+                          EdgeInsets.fromLTRB(42, 0, 8, 0),
+                        ),
                       ),
-                    ),
-                onPressed: w.editingLocked || _editingId != null
-                    ? null
-                    : () async {
-                        await w.select(volume, chapter);
-                      },
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      displayChapterTitle(
-                        w.book,
-                        volume,
-                        chapter,
-                        rawTitle: active ? w.editor.title.text : null,
-                        untitledLabel: t(context, 'common.untitledChapter'),
+                  onPressed: w.editingLocked || _editingId != null
+                      ? null
+                      : () async {
+                          await w.select(volume, chapter);
+                        },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayChapterTitle(
+                            w.book,
+                            volume,
+                            chapter,
+                            rawTitle: active ? w.editor.title.text : null,
+                            untitledLabel: t(context, 'common.untitledChapter'),
+                          ),
+                          textAlign: TextAlign.start,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: active
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color:
+                                effectiveChapterNumbering(w.book, volume) ==
+                                        null &&
+                                    (active
+                                            ? w.editor.title.text
+                                            : chapter.title)
+                                        .trim()
+                                        .isEmpty
+                                ? mutedTextColor(context)
+                                : null,
+                          ),
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: active
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                        color:
-                            effectiveChapterNumbering(w.book, volume) == null &&
-                                (active ? w.editor.title.text : chapter.title)
-                                    .trim()
-                                    .isEmpty
-                            ? mutedTextColor(context)
-                            : null,
+                      const SizedBox(width: 8),
+                      Text(
+                        formatWordCount(
+                          active ? w.editor.wordCount : chapter.wordCount,
+                        ),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: mutedTextColor(context),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      formatWordCount(
-                        active ? w.editor.wordCount : chapter.wordCount,
-                      ),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: mutedTextColor(context),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (w.moveMode == MoveMode.chapters)
-              _drag.grip(context, volume, chapter)
-            else
-              _menuButton(
-                'chapter-menu-${chapter.id}',
-                (p) => _menus.chapterMenu(context, volume, chapter, p),
-              ),
-          ],
+              if (w.moveMode == MoveMode.chapters)
+                _drag.grip(context, volume, chapter)
+              else
+                _menuButton(
+                  'chapter-menu-${chapter.id}',
+                  (p) => _menus.chapterMenu(context, volume, chapter, p),
+                ),
+            ],
+          ),
         ),
       ),
     );

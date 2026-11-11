@@ -53,17 +53,22 @@ void main() {
     expect(ChapterMeta.fromJson({'id': 'c'}).title, '未命名章');
   });
 
-  test('新建仍保留默认卷章名而非自动创建空名称', () async {
+  test('新建保留默认卷名，空原始章名由汉字编号展示', () async {
     final h = await createHarness();
     addTearDown(h.dispose);
     final summary = await h.app.library.createBook('新建默认名');
     final book = await h.app.library.openBook(summary);
     expect(book.volumes.first.title, '未命名卷');
-    expect(book.allChapters.first.title, '未命名章节');
+    expect(book.allChapters.first.title, '');
+    expect(
+      displayChapterTitle(book, book.volumes.first, book.allChapters.first),
+      '第一章',
+    );
     final volume = await h.app.library.structure.appendVolume(book);
     final chapter = await h.app.library.structure.appendChapter(book, volume);
     expect(volume.title, '未命名卷');
-    expect(chapter.title, '未命名章节');
+    expect(chapter.title, '');
+    expect(displayChapterTitle(book, volume, chapter), '第二章');
   });
 
   test('编辑器清空章名落盘且不改正文备份字节', () async {
@@ -114,13 +119,14 @@ void main() {
     final book = await h.app.library.openBook(summary);
     final volume = book.volumes.first;
     final chapter = volume.chapters.first;
+    await h.app.library.structure.renameChapter(book, chapter, '原章名');
     await h.app.editor.open(inBook: book, inVolume: volume, inChapter: chapter);
     h.app.editor.title.text = '';
     writer.fail = true;
     try {
       expect(await h.app.editor.flush(), isFalse);
       expect(h.app.editor.title.text, '');
-      expect(chapter.title, '未命名章节');
+      expect(chapter.title, '原章名');
       expect(h.app.editor.state, SaveState.failed);
     } finally {
       writer.fail = false;

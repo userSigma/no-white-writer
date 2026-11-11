@@ -14,6 +14,7 @@ import 'package:no_white_writer/ui/theme/tokens.dart';
 import 'support/app_harness.dart';
 import 'support/fake_platform.dart';
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 
 /// G：真实章／卷／书菜单导出，全部以菜单打开时捕获的稳定 ID 为目标。
 void main() {
@@ -57,6 +58,11 @@ void main() {
     final book = (await tester.runAsync(() async {
       final summary = await h.app.library.createBook(bookTitle);
       final opening = await h.app.library.openBook(summary);
+      // 保持本组自定义原始标题的无编号导出场景。
+      await h.app.library.structure.setGlobalNumbering(
+        opening,
+        const ChapterNumbering(),
+      );
       final volume = opening.volumes.first;
       await h.app.library.setVolumeExpanded(opening, volume.id, true);
       await h.app.library.structure.renameVolume(opening, volume, '第1卷');
@@ -118,7 +124,7 @@ void main() {
   }
 
   Future<void> openChapterMenu(WidgetTester tester, String chapterId) async {
-    await tester.tap(find.byKey(ValueKey('chapter-menu-$chapterId')));
+    await tapWithMouse(tester, find.byKey(ValueKey('chapter-menu-$chapterId')));
     await tester.pumpAndSettle();
   }
 
@@ -239,7 +245,10 @@ void main() {
     );
     final volume = book.volumes.first;
     await pumpEditor(tester, h, book);
-    await tester.tap(find.byKey(ValueKey('volume-menu-${volume.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('volume-menu-${volume.id}')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('导出本卷'), findsOneWidget);
     await tester.tap(find.text('导出本卷'));
@@ -286,7 +295,7 @@ void main() {
     await tester.pumpWidget(NoWhiteWriterApp(app: h.app));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(ValueKey('book-menu-${summary.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('book-menu-${summary.id}')));
     await tester.pumpAndSettle();
     expect(find.text('导出本书'), findsOneWidget);
     await tester.tap(find.text('导出本书'));
@@ -303,7 +312,7 @@ void main() {
 
     expect(
       outTexts().values.single,
-      '──── 卷：第一卷 ────\n\n──── 章：首章 ────\n\n正文\n──── 卷：空卷 ────\n\n',
+      '──── 卷：第一卷 ────\n\n──── 章：第一章 首章 ────\n\n正文\n──── 卷：空卷 ────\n\n',
     );
     await tester.tap(find.byKey(const ValueKey('export-close')));
     await tester.pumpAndSettle();
@@ -327,7 +336,7 @@ void main() {
     await tester.pumpWidget(NoWhiteWriterApp(app: h.app));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(ValueKey('book-menu-${summary.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('book-menu-${summary.id}')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('导出本书'));
     await finishIo(tester);
@@ -426,7 +435,10 @@ void main() {
           .onPressed,
       isNull,
     );
-    await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('导出本章'), findsNothing);
     expect(
@@ -481,7 +493,10 @@ void main() {
       selection: TextSelection.collapsed(offset: 3),
     );
     await tester.pump();
-    await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('导出本章'), findsNothing);
     expect(
@@ -655,7 +670,7 @@ void main() {
     }))!;
     await pumpEditor(tester, h, book);
 
-    await tester.tap(find.byKey(ValueKey('volume-menu-${empty.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${empty.id}')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('导出本卷'));
     await finishIo(
@@ -724,7 +739,10 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+      await tapWithMouse(
+        tester,
+        find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+      );
       await tester.pumpAndSettle();
       expect(find.text('导出本章'), findsNothing);
       expect(find.text('删除章'), findsNothing);
@@ -942,7 +960,10 @@ void main() {
           ? h.app.editor.title
           : h.app.editor.text;
       expect(controller.value.composing, composing.composing);
-      await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+      await tapWithMouse(
+        tester,
+        find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+      );
       await finishIo(tester);
       await tester.pumpAndSettle();
       expect(controller.value, composing, reason: '菜单点击不得通过失焦清除 composing');

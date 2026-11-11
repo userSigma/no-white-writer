@@ -51,15 +51,18 @@ void main() {
     expect(await one.readAsString(), '只导出正文\n');
     expect(c.title, '第 2 章 原章名');
     expect(h.app.editor.title.text, c.title);
-    // 切回跟随全局且全局关闭：导出文件名随之失去编号前缀。
-    await h.app.editor.runStructure(
-      b,
-      () => h.app.library.structure.setVolumeNumberingMode(
+    // 显式关闭全局规则再切回跟随：导出文件名失去编号前缀。
+    await h.app.editor.runStructure(b, () async {
+      await h.app.library.structure.setGlobalNumbering(
+        b,
+        const ChapterNumbering(),
+      );
+      await h.app.library.structure.setVolumeNumberingMode(
         b,
         v,
         VolumeNumberingMode.followGlobal,
-      ),
-    );
+      );
+    });
     final off = (await h.app.exporter.export(
       ExportTarget.chapter(b.id, v.id, c.id),
     ))!;
@@ -97,7 +100,7 @@ void main() {
     );
     await finishIo(tester, until: () => editorReady(tester));
     final platform = h.app.platform as FakePlatformServices;
-    expect(platform.lastTitle, '不白写作 — 窗口名 · 第1章 未命名章节');
+    expect(platform.lastTitle, '不白写作 — 窗口名 · 第1章');
     h.app.editor.title.text = '作者新名';
     await tester.pump();
     expect(platform.lastTitle, '不白写作 — 窗口名 · 第1章 作者新名');
@@ -132,7 +135,7 @@ void main() {
     await finishIo(tester, until: () => editorReady(tester));
     final platform = h.app.platform as FakePlatformServices;
     // 新书默认卷：第 1 章；新加的第二卷第 1 章占用全局第 2 号。
-    expect(platform.lastTitle, '不白写作 — 全局窗口 · 第2章 未命名章节');
+    expect(platform.lastTitle, '不白写作 — 全局窗口 · 第2章');
     await finishWidget(tester, h);
   });
 }

@@ -264,17 +264,26 @@ class _MenuState extends State<_Menu> {
                                       )
                                     : null,
                               ),
-                              Expanded(child: Text(widget.actions[i].label)),
-                              if (widget.actions[i].hasChildren)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: Icon(
-                                    FluentIcons.chevron_right,
-                                    size: 11,
-                                    color:
-                                        theme.resources.textFillColorSecondary,
-                                  ),
+                              Expanded(
+                                child: Text(
+                                  widget.actions[i].label,
+                                  textAlign: TextAlign.center,
                                 ),
+                              ),
+                              // Keep both indicator slots equal even when empty,
+                              // so labels are centered on the entire menu row.
+                              SizedBox(
+                                width: 18,
+                                child: widget.actions[i].hasChildren
+                                    ? Icon(
+                                        FluentIcons.chevron_right,
+                                        size: 11,
+                                        color: theme
+                                            .resources
+                                            .textFillColorSecondary,
+                                      )
+                                    : null,
+                              ),
                             ],
                           ),
                         ),
