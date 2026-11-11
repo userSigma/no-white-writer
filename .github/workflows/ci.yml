@@ -60,10 +60,25 @@ jobs:
       - name: 构建 Windows x64 release
         run: flutter build windows --release
 
+      - name: 准备 Inno Setup 编译器
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe") -and
+              -not (Test-Path "$env:ProgramFiles/Inno Setup 6/ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup 安装失败：$LASTEXITCODE" }
+          }
+
+      - name: 编译每用户安装包并计算 SHA-256
+        run: dart run tool/build_windows_installer.dart --skip-build
+
       # 产物仅用于排查构建问题，不是正式发布包（正式包走 release.yml）。
       - name: 上传构建产物
         uses: actions/upload-artifact@v5
         with:
           name: windows-x64-release-${{ github.sha }}
-          path: build/windows/x64/runner/Release/
+          path: |
+            build/windows/x64/runner/Release/
+            build/packages/*-setup.exe
+            build/packages/*-setup.exe.sha256
           retention-days: 7

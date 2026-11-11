@@ -10,6 +10,7 @@ import 'package:no_white_writer/ui/theme/tokens.dart';
 
 import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 
 const _frameKey = ValueKey('sidebar-frame');
 const _hostKey = ValueKey('chapter-pane-host');
@@ -108,7 +109,7 @@ void main() {
     await finishWidget(tester, h);
   });
 
-  testWidgets('底部固定 footer：左返回、右设置，顶栏不再有返回／设置／导出', (tester) async {
+  testWidgets('返回固定左上且收起可达，设置保留侧栏底部', (tester) async {
     final h = await widgetHarness(tester);
     final book = await _openBook(tester, h);
     await _pumpEditor(tester, h, book);
@@ -129,15 +130,24 @@ void main() {
     );
     expect(back.left, greaterThanOrEqualTo(pane.left));
     expect(back.center.dx, lessThan(pane.center.dx));
-    expect(back.bottom, inInclusiveRange(pane.bottom - 56, pane.bottom));
+    final Rect bar = tester.getRect(
+      find.byKey(const ValueKey('window-title-bar')),
+    );
+    expect(back.top, greaterThanOrEqualTo(bar.top));
+    expect(back.bottom, lessThanOrEqualTo(bar.bottom));
+    expect(back.center.dy, closeTo(bar.center.dy, 1));
+    expect(bar.bottom, lessThanOrEqualTo(pane.top));
     expect(gear.right, lessThanOrEqualTo(pane.right));
     expect(gear.center.dx, greaterThan(pane.center.dx));
     expect(gear.bottom, inInclusiveRange(pane.bottom - 56, pane.bottom));
 
-    // 已确认 B：整个目录完全收起，footer 也必须一起隐藏。
+    // 目录与底部设置一起隐藏；左上导航不能随之消失。
     await tester.tap(find.byKey(const ValueKey('toggle-sidebar')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('back-to-shelf')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('back-to-shelf')).hitTestable(),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('settings-button')), findsNothing);
     await finishWidget(tester, h);
   });
@@ -172,7 +182,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-chapter-pane')));
     await tester.pumpAndSettle();
     final volume = book.volumes.first;
-    await tester.tap(find.byKey(ValueKey('volume-menu-${volume.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('volume-menu-${volume.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
@@ -309,7 +322,10 @@ void main() {
     final book = await _openBook(tester, h);
     await _pumpEditor(tester, h, book);
     final volume = book.volumes.first;
-    await tester.tap(find.byKey(ValueKey('volume-menu-${volume.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('volume-menu-${volume.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
@@ -364,7 +380,10 @@ void main() {
     final book = await _openBook(tester, h);
     await _pumpEditor(tester, h, book);
     final volume = book.volumes.first;
-    await tester.tap(find.byKey(ValueKey('volume-menu-${volume.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('volume-menu-${volume.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();

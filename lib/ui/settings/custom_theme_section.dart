@@ -137,45 +137,54 @@ class _CustomThemeSectionState extends State<CustomThemeSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          ComboBox<String>(
-            key: const ValueKey('settings-theme'),
-            value: themeEntries.any((entry) => entry.$1 == settings.themeMode)
-                ? settings.themeMode
-                : null,
-            items: <ComboBoxItem<String>>[
-              for (final entry in themeEntries)
-                ComboBoxItem<String>(value: entry.$1, child: Text(entry.$2)),
-            ],
-            onChanged: widget.blocked
-                ? null
-                : (mode) {
-                    if (mode != null) widget.settings.setThemeMode(mode);
-                  },
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Row(
             children: <Widget>[
-              Button(
-                onPressed:
-                    widget.blocked ||
-                        settings.customThemes.length >=
-                            SettingsController.customThemeLimit
-                    ? null
-                    : () => unawaited(_createCustomTheme()),
-                child: Text(t(context, 'settings.theme.newCustom')),
-              ),
-              if (settings.customThemes.isNotEmpty)
-                Button(
-                  onPressed: widget.blocked
+              Expanded(
+                child: ComboBox<String>(
+                  key: const ValueKey('settings-theme'),
+                  isExpanded: true,
+                  value:
+                      themeEntries.any(
+                        (entry) => entry.$1 == settings.themeMode,
+                      )
+                      ? settings.themeMode
+                      : null,
+                  items: <ComboBoxItem<String>>[
+                    for (final entry in themeEntries)
+                      ComboBoxItem<String>(
+                        value: entry.$1,
+                        child: Text(entry.$2),
+                      ),
+                  ],
+                  onChanged: widget.blocked
                       ? null
-                      : () => setState(() => _manageOpen = !_manageOpen),
-                  child: Text(t(context, 'settings.theme.manage')),
+                      : (mode) {
+                          if (mode != null) widget.settings.setThemeMode(mode);
+                        },
                 ),
+              ),
+              const SizedBox(width: 8),
+              Button(
+                key: const ValueKey('settings-theme-manage'),
+                onPressed: widget.blocked
+                    ? null
+                    : () => setState(() => _manageOpen = !_manageOpen),
+                child: Text(t(context, 'settings.theme.manage')),
+              ),
             ],
           ),
           if (_manageOpen) ...<Widget>[
+            const SizedBox(height: 8),
+            Button(
+              key: const ValueKey('settings-theme-create'),
+              onPressed:
+                  widget.blocked ||
+                      settings.customThemes.length >=
+                          SettingsController.customThemeLimit
+                  ? null
+                  : () => unawaited(_createCustomTheme()),
+              child: Text(t(context, 'settings.theme.newCustom')),
+            ),
             const SizedBox(height: 8),
             for (final CustomTheme theme in settings.customThemes)
               Padding(

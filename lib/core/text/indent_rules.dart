@@ -15,7 +15,7 @@ TextEditingValue applyEnterIndent(
   required bool autoIndent,
   required bool blankLineBetween,
 }) {
-  if (!autoIndent) return newValue;
+  if (!autoIndent && !blankLineBetween) return newValue;
   if (isComposingValue(newValue)) return newValue;
 
   final String text = newValue.text;
@@ -37,9 +37,9 @@ TextEditingValue applyEnterIndent(
 
   String insertion = '';
   if (!consecutive) {
-    if (!alreadyIndented) insertion = kIndent;
-    // 段间空行（默认关）：只在段末回车时补一个空行，空行本身不含全角空格。
-    if (blankLineBetween && insertion.isNotEmpty && afterLine.isEmpty) {
+    if (autoIndent && !alreadyIndented) insertion = kIndent;
+    // 段间空行独立于缩进；只在非空段末回车时补一行，连续回车不倍增。
+    if (blankLineBetween && beforeLine.trim().isNotEmpty && afterLine.isEmpty) {
       insertion = '\n$insertion';
     }
   }

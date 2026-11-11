@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../core/ids.dart';
+import '../core/chapter_numbering.dart';
 import '../core/models.dart';
 import '../core/storage/app_paths.dart';
 import '../core/storage/book_store.dart';
@@ -162,13 +163,14 @@ class LibraryController extends ChangeNotifier {
     final String title = rawTitle.trim().isEmpty ? '未命名作品' : rawTitle.trim();
     final DateTime now = DateTime.now();
     final String bookId = newId();
-    final BookIndex book = BookIndex(id: bookId, title: title, notes: notes);
-    final Volume volume = Volume(id: newId(), title: '未命名卷', order: 0);
-    final ChapterMeta chapter = ChapterMeta(
-      id: newId(),
-      title: '未命名章节',
-      order: 0,
+    final BookIndex book = BookIndex(
+      id: bookId,
+      title: title,
+      notes: notes,
+      globalNumbering: const ChapterNumbering(enabled: true, style: 'chinese'),
     );
+    final Volume volume = Volume(id: newId(), title: '未命名卷', order: 0);
+    final ChapterMeta chapter = ChapterMeta(id: newId(), title: '', order: 0);
     volume.chapters.add(chapter);
     book.volumes.add(volume);
     final BookSummary summary = BookSummary(

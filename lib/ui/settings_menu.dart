@@ -15,10 +15,7 @@ import 'settings/export_directory_section.dart';
 import 'settings/settings_row.dart';
 import 'theme/tokens.dart';
 
-/// 设置入口按钮：点击打开「设置浮窗」（ContentDialog）。
-///
-/// 书架页与编辑器侧栏共用同一按钮与浮窗；dev 验收入口通过 [open]
-/// 打开的是同一个浮窗，而不是单独页面。
+/// 书架与编辑器共用的设置入口，只接收实际使用的依赖。
 class SettingsMenuButton extends StatefulWidget {
   const SettingsMenuButton({
     super.key,
@@ -31,6 +28,7 @@ class SettingsMenuButton extends StatefulWidget {
     required this.uiGuards,
     this.enabled = true,
     this.beforeOpen,
+    this.secondary = false,
   });
   final EditorController editor;
   final ExportController exporter;
@@ -40,6 +38,7 @@ class SettingsMenuButton extends StatefulWidget {
   final AppPaths paths;
   final UiOperationGuards uiGuards;
   final bool enabled;
+  final bool secondary;
   final Future<bool> Function()? beforeOpen;
   @override
   State<SettingsMenuButton> createState() => SettingsMenuButtonState();
@@ -48,8 +47,7 @@ class SettingsMenuButton extends StatefulWidget {
 class SettingsMenuButtonState extends State<SettingsMenuButton> {
   bool _opening = false;
 
-  /// Opens the settings dialog; the dev entry point uses this so the
-  /// acceptance shortcut shows the real dialog instead of a separate page.
+  /// 开发验收入口也通过此方法打开真实浮窗。
   Future<void> open() async {
     if (_opening ||
         !widget.enabled ||
@@ -82,17 +80,30 @@ class SettingsMenuButtonState extends State<SettingsMenuButton> {
   }
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: t(context, 'settings.title'),
-    child: IconButton(
-      key: const ValueKey('settings-button'),
-      icon: const Icon(FluentIcons.settings),
-      onPressed:
-          widget.enabled && !widget.exporter.busy && !widget.editor.isComposing
-          ? open
-          : null,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final onPressed =
+        widget.enabled && !widget.exporter.busy && !widget.editor.isComposing
+        ? open
+        : null;
+    return Tooltip(
+      message: t(context, 'settings.title'),
+      child: widget.secondary
+          ? Button(
+              key: const ValueKey('settings-button'),
+              onPressed: onPressed,
+              child: const SizedBox(
+                width: 16,
+                height: 20,
+                child: Center(child: Icon(FluentIcons.settings, size: 16)),
+              ),
+            )
+          : IconButton(
+              key: const ValueKey('settings-button'),
+              icon: const Icon(FluentIcons.settings),
+              onPressed: onPressed,
+            ),
+    );
+  }
 }
 
 class _SettingsDialog extends StatefulWidget {
@@ -120,14 +131,14 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   String? _message;
   bool _messageError = false;
   bool get _working => _directory.working;
-  bool get _composing => _directory.composing;
-  bool get _modalOpen => _confirming || _directory.confirming;
 
   @override
   void initState() {
     super.initState();
     _directory = ExportDirectoryDraft(
       settings: widget.settings,
+      paths: widget.paths,
+      selectDirectory: widget.platform.selectDirectory,
       revealDirectory: widget.platform.revealInFileManager,
       notice: (text, error) => _notice(text, error: error),
     )..addListener(_refresh);
@@ -139,15 +150,13 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     if (mounted) setState(() {});
   }
 
-  /// Esc 关闭浮窗（确认框打开时交还给确认框自己）。
-  ///
-  /// 走焦点系统而不是全局键盘钩子：ComboBox 弹层打开时它内部先消费
-  /// Esc 只关弹层，未消费的 Esc 才冒泡到这里关闭浮窗。
+  // ComboBox 弹层先消费 Esc；未消费的 Esc 才关闭设置浮窗。
   KeyEventResult _key(FocusNode node, KeyEvent event) {
-    if (event.logicalKey != LogicalKeyboardKey.escape || _modalOpen) {
+    if (event.logicalKey != LogicalKeyboardKey.escape ||
+        _confirming ||
+        event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
     unawaited(requestClose());
     return KeyEventResult.handled;
   }
@@ -179,12 +188,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   }
 
   void _setLanguage(String code) {
-    if (widget.i18n.setLanguage(code)) {
-      widget.settings.setLanguage(code);
-    }
+    if (widget.i18n.setLanguage(code)) widget.settings.setLanguage(code);
   }
-
-  // ---- 布局辅助 ----------------------------------------------------------
 
   Widget _divider() => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -199,12 +204,12 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     Key? comboKey,
   }) => ComboBox<double>(
     key: comboKey,
+    isExpanded: true,
     value: value,
-    items: <ComboBoxItem<double>>[
-      for (final double v in values)
-        ComboBoxItem<double>(value: v, child: Text(label(v))),
+    items: [
+      for (final v in values) ComboBoxItem(value: v, child: Text(label(v))),
     ],
-    onChanged: _working || _composing ? null : onChanged,
+    onChanged: _working ? null : onChanged,
   );
 
   @override
@@ -224,30 +229,52 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         onKeyEvent: _key,
         child: ContentDialog(
           key: const ValueKey('settings-menu'),
-          title: Text(
-            t(context, 'settings.title'),
-            style: const TextStyle(
-              color: AppColors.cinnabar,
-              fontWeight: FontWeight.w600,
-            ),
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 756),
+          style: const ContentDialogThemeData(
+            padding: EdgeInsetsDirectional.fromSTEB(24, 20, 24, 20),
+            actionsPadding: EdgeInsetsDirectional.fromSTEB(24, 16, 24, 16),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t(context, 'settings.title'),
+                  style: TextStyle(
+                    color: accentColor(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Tooltip(
+                message: t(context, 'common.close'),
+                child: IconButton(
+                  key: const ValueKey('settings-close'),
+                  icon: const Icon(FluentIcons.chrome_close, size: 14),
+                  onPressed: _working || _confirming
+                      ? null
+                      : () => unawaited(requestClose()),
+                ),
+              ),
+            ],
           ),
           content: SizedBox(
-            width: 500,
+            width: 560,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
+                children: [
                   SettingsRow(
                     label: t(context, 'settings.language'),
                     child: ComboBox<String>(
                       key: const ValueKey('settings-language'),
+                      isExpanded: true,
                       value: packs.any((p) => p.code == widget.i18n.currentCode)
                           ? widget.i18n.currentCode
                           : null,
-                      items: <ComboBoxItem<String>>[
+                      items: [
                         for (final pack in packs)
-                          ComboBoxItem<String>(
+                          ComboBoxItem(
                             value: pack.code,
                             child: Text('${pack.name} (${pack.code})'),
                           ),
@@ -261,9 +288,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   ),
                   CustomThemeSection(
                     settings: widget.settings,
-                    blocked: _working || _composing,
-                    onModalChanged: (value) =>
-                        setState(() => _confirming = value),
+                    blocked: _working,
+                    onModalChanged: (value) {
+                      if (mounted) setState(() => _confirming = value);
+                    },
                     notice: _notice,
                   ),
                   _divider(),
@@ -275,7 +303,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                           ? settings.fontSize
                           : null,
                       values: fontSizes,
-                      label: (v) => v.toInt().toString(),
+                      label: (v) => t(context, 'settings.fontSize.value', {
+                        'value': v.toInt().toString(),
+                      }),
                       onChanged: (value) {
                         if (value != null) widget.settings.setFontSize(value);
                       },
@@ -289,7 +319,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                           ? settings.lineHeight
                           : null,
                       values: lineHeights,
-                      label: (v) => v.toStringAsFixed(1),
+                      label: (v) => t(context, 'settings.lineHeight.value', {
+                        'value': v.toStringAsFixed(1),
+                      }),
                       onChanged: (value) {
                         if (value != null) widget.settings.setLineHeight(value);
                       },
@@ -302,7 +334,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       child: ToggleSwitch(
                         key: const ValueKey('settings-auto-indent'),
                         checked: settings.autoIndent,
-                        onChanged: _working || _composing
+                        onChanged: _working
                             ? null
                             : widget.settings.setAutoIndent,
                       ),
@@ -315,7 +347,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       child: ToggleSwitch(
                         key: const ValueKey('settings-blank-line'),
                         checked: settings.blankLineBetween,
-                        onChanged: _working || _composing
+                        onChanged: _working
                             ? null
                             : widget.settings.setBlankLineBetween,
                       ),
@@ -331,7 +363,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
+                      children: [
                         Text(
                           t(context, 'settings.about.version'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
@@ -347,7 +379,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       ],
                     ),
                   ),
-                  if (error != null) ...<Widget>[
+                  if (error != null) ...[
                     const SizedBox(height: 8),
                     Text(
                       t(context, 'settings.saveError', {'error': error}),
@@ -359,7 +391,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     ),
                     const SizedBox(height: 4),
                     Button(
-                      onPressed: _working || _composing
+                      onPressed: _working
                           ? null
                           : () => _directory.retry(context),
                       child: Text(t(context, 'settings.retrySave')),
@@ -380,12 +412,13 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               ),
             ),
           ),
-          actions: <Widget>[
-            FilledButton(
-              onPressed: _working || _composing || _modalOpen
+          actions: [
+            Button(
+              key: const ValueKey('settings-done'),
+              onPressed: _working || _confirming
                   ? null
                   : () => unawaited(requestClose()),
-              child: Text(t(context, 'common.close')),
+              child: Text(t(context, 'settings.done')),
             ),
           ],
         ),

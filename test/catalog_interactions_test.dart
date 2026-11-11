@@ -9,6 +9,7 @@ import 'package:no_white_writer/ui/chapter_pane.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 
 class _HeldWriter extends AtomicFileWriter {
   Completer<void>? hold;
@@ -47,7 +48,10 @@ void main() {
         home: ChapterPane(workspace: workspace, expanded: {}, draft: draft),
       ),
     );
-    await tester.tap(find.byKey(ValueKey('volume-menu-${volume.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('volume-menu-${volume.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
@@ -98,7 +102,10 @@ void main() {
       home: ChapterPane(workspace: workspace, expanded: {}, draft: draft),
     );
     await tester.pumpWidget(pane(first));
-    await tester.tap(find.byKey(ValueKey('volume-menu-${volume.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('volume-menu-${volume.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();

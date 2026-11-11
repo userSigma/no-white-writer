@@ -34,6 +34,7 @@ class EditorController extends ChangeNotifier {
     );
     _text.addListener(_onChanged);
     _title.addListener(_onChanged);
+    settings.addListener(_text.refreshParagraphStyle);
   }
 
   final ChapterStore chapters;
@@ -450,6 +451,7 @@ class EditorController extends ChangeNotifier {
     _disposed = true;
     ++_openToken;
     _debounce?.cancel();
+    settings.removeListener(_text.refreshParagraphStyle);
     _text.removeListener(_onChanged);
     _title.removeListener(_onChanged);
     _text.dispose();

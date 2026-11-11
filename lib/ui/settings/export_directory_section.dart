@@ -4,68 +4,47 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import '../../core/i18n/i18n.dart';
 import '../../core/storage/app_paths.dart';
-import '../../core/text/composing.dart';
 import '../../state/settings_controller.dart';
+import '../theme/tokens.dart';
 import 'settings_row.dart';
 
-/// 浮窗私有的目录编辑会话：保存失败保留输入，退出前处理组词与丢弃确认。
-/// 不拥有 SettingsController，也不在销毁时隐式保存或丢弃草稿。
+/// 浮窗私有的目录选择会话；保留 P2 分区边界，目录由原生选择器提交。
+/// 保存失败保留已选路径及控制器错误，关闭或重试时再次提交，不回滚用户选择。
 class ExportDirectoryDraft extends ChangeNotifier {
   ExportDirectoryDraft({
     required this.settings,
+    required this.paths,
+    required this.selectDirectory,
     required this.revealDirectory,
     required this.notice,
   }) : path = TextEditingController(
-         text: settings.settings.exportDirectory ?? '',
+         text: paths.exportRoot(settings.settings.exportDirectory),
        ) {
-    path.addListener(_changed);
+    settings.addListener(_syncPath);
   }
 
   final SettingsController settings;
+  final AppPaths paths;
+  final Future<String?> Function({String? initialDirectory}) selectDirectory;
   final Future<bool> Function(String) revealDirectory;
   final void Function(String?, bool) notice;
   final TextEditingController path;
   bool working = false;
-  bool confirming = false;
   bool _disposed = false;
-
-  bool get composing => isComposingValue(path.value);
-  bool get dirty =>
-      path.text.trim() != (settings.settings.exportDirectory ?? '');
 
   void _changed() {
     if (!_disposed) notifyListeners();
   }
 
+  void _syncPath() {
+    if (_disposed) return;
+    final effective = paths.exportRoot(settings.settings.exportDirectory);
+    if (path.text != effective) path.text = effective;
+    _changed();
+  }
+
   Future<bool> prepareClose(BuildContext context) async {
-    if (working || composing || confirming || _disposed) return false;
-    if (dirty) {
-      confirming = true;
-      final bool? discard;
-      try {
-        discard = await showDialog<bool>(
-          context: context,
-          builder: (context) => ContentDialog(
-            title: Text(t(context, 'settings.exportDir.confirm.title')),
-            content: Text(t(context, 'settings.exportDir.confirm.body')),
-            actions: [
-              Button(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(t(context, 'settings.exportDir.confirm.keep')),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(t(context, 'settings.exportDir.confirm.discard')),
-              ),
-            ],
-          ),
-        );
-      } finally {
-        confirming = false;
-      }
-      if (_disposed || !context.mounted || discard != true) return false;
-      path.text = settings.settings.exportDirectory ?? '';
-    }
+    if (working || _disposed) return false;
     try {
       await settings.flush();
       return true;
@@ -77,24 +56,28 @@ class ExportDirectoryDraft extends ChangeNotifier {
     }
   }
 
-  Future<void> save(BuildContext context, {bool useDefault = false}) async {
-    if (working || composing || _disposed) return;
+  Future<void> change(BuildContext context, {bool useDefault = false}) async {
+    if (working || _disposed) return;
     working = true;
-    // 清除上一条即时消息；持久化错误仍由控制器持有。
     notice(null, false);
     _changed();
-    final previous = settings.settings.exportDirectory;
-    if (useDefault) path.text = '';
-    final text = path.text.trim();
-    settings.setExportDirectory(text.isEmpty ? null : text);
     try {
+      final selected = useDefault
+          ? null
+          : await selectDirectory(initialDirectory: path.text);
+      if (_disposed || !context.mounted || (!useDefault && selected == null)) {
+        return;
+      }
+      settings.setExportDirectory(selected);
       await settings.flush();
       if (!_disposed && context.mounted) {
         notice(t(context, 'settings.exportDir.saved'), false);
       }
-    } catch (_) {
-      // 只恢复已确认的偏好，不覆盖失败输入；重试必须再次提交当前草稿。
-      settings.settings.exportDirectory = previous;
+    } catch (error) {
+      // 持久化错误由 SettingsController 持有；原生选择器错误单独展示。
+      if (!_disposed && context.mounted && settings.saveError == null) {
+        notice('$error', true);
+      }
     } finally {
       working = false;
       _changed();
@@ -102,8 +85,9 @@ class ExportDirectoryDraft extends ChangeNotifier {
   }
 
   Future<void> retry(BuildContext context) async {
-    if (working || composing || _disposed) return;
-    if (dirty) return save(context);
+    if (working || _disposed) return;
+    working = true;
+    _changed();
     try {
       await settings.flush();
       if (!_disposed && context.mounted) {
@@ -113,11 +97,14 @@ class ExportDirectoryDraft extends ChangeNotifier {
       if (!_disposed && context.mounted) {
         notice(t(context, 'settings.saveError', {'error': '$error'}), true);
       }
+    } finally {
+      working = false;
+      _changed();
     }
   }
 
   Future<void> openDirectory(BuildContext context, String directory) async {
-    if (working || composing || _disposed) return;
+    if (working || _disposed) return;
     working = true;
     _changed();
     try {
@@ -142,13 +129,13 @@ class ExportDirectoryDraft extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    path.removeListener(_changed);
+    settings.removeListener(_syncPath);
     path.dispose();
     super.dispose();
   }
 }
 
-/// 目录字段和相关操作只依赖该编辑会话与路径，不触达应用依赖容器。
+/// 只读路径和原生选择按钮；不触达应用依赖容器。
 class ExportDirectorySection extends StatelessWidget {
   const ExportDirectorySection({
     super.key,
@@ -160,92 +147,96 @@ class ExportDirectorySection extends StatelessWidget {
   final AppPaths paths;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      SettingsRow(
-        label: t(context, 'settings.exportDir'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            TextBox(
-              key: const ValueKey('settings-export-path'),
-              controller: draft.path,
-              enabled: !draft.working,
-              placeholder: t(context, 'settings.exportDir.hint'),
-              onEditingComplete: () {},
-              onSubmitted: (_) {
-                if (!draft.composing) unawaited(draft.save(context));
-              },
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                Button(
-                  onPressed: draft.working || draft.composing
-                      ? null
-                      : () => unawaited(draft.save(context)),
-                  child: Text(t(context, 'common.save')),
-                ),
-                Button(
-                  onPressed: draft.working || draft.composing
-                      ? null
-                      : () => unawaited(draft.save(context, useDefault: true)),
-                  child: Text(t(context, 'settings.exportDir.reset')),
-                ),
-                Button(
-                  onPressed: draft.working || draft.composing
-                      ? null
-                      : () {
-                          if (draft.dirty) {
-                            draft.notice(
-                              t(context, 'settings.exportDir.pending'),
-                              true,
-                            );
-                            return;
-                          }
-                          unawaited(
-                            draft.openDirectory(
-                              context,
-                              paths.exportRoot(
-                                draft.settings.settings.exportDirectory,
-                              ),
-                            ),
-                          );
-                        },
-                  child: Text(t(context, 'settings.exportDir.open')),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      SettingsRow(
-        label: '',
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            Button(
-              onPressed: draft.working
-                  ? null
-                  : () => unawaited(
-                      draft.openDirectory(context, paths.dataRootPath),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: draft,
+    builder: (context, _) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SettingsRow(
+          label: t(context, 'settings.exportDir'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: TextBox(
+                      key: const ValueKey('settings-export-path'),
+                      controller: draft.path,
+                      readOnly: true,
+                      enabled: !draft.working,
+                      maxLines: 2,
+                      minLines: 1,
                     ),
-              child: Text(t(context, 'settings.dataDir')),
-            ),
-            Button(
-              onPressed: draft.working
-                  ? null
-                  : () =>
-                        unawaited(draft.openDirectory(context, paths.logsDir)),
-              child: Text(t(context, 'settings.logsDir')),
-            ),
-          ],
+                  ),
+                  const SizedBox(width: 8),
+                  Button(
+                    key: const ValueKey('settings-change-export-path'),
+                    onPressed: draft.working
+                        ? null
+                        : () => unawaited(draft.change(context)),
+                    child: Text(t(context, 'settings.exportDir.change')),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  Button(
+                    onPressed: draft.working
+                        ? null
+                        : () => unawaited(
+                            draft.openDirectory(context, draft.path.text),
+                          ),
+                    child: Text(t(context, 'settings.exportDir.open')),
+                  ),
+                  Button(
+                    key: const ValueKey('settings-export-reset'),
+                    onPressed: draft.working
+                        ? null
+                        : () => unawaited(
+                            draft.change(context, useDefault: true),
+                          ),
+                    child: Text(t(context, 'settings.exportDir.reset')),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
-    ],
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Container(height: 1, color: hairlineColor(context)),
+        ),
+        SettingsRow(
+          label: t(context, 'settings.systemDir'),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              Button(
+                onPressed: draft.working
+                    ? null
+                    : () => unawaited(
+                        draft.openDirectory(context, paths.dataRootPath),
+                      ),
+                child: Text(t(context, 'settings.dataDir')),
+              ),
+              Button(
+                onPressed: draft.working
+                    ? null
+                    : () => unawaited(
+                        draft.openDirectory(context, paths.logsDir),
+                      ),
+                child: Text(t(context, 'settings.logsDir')),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }

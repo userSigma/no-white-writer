@@ -19,7 +19,21 @@ Flutter 编写，v1 只发布 Windows x64，代码结构为 macOS ARM / Windows 
 - **导出**：章节菜单导出本章、卷菜单导出本卷、书架作品菜单导出本书，均为 UTF-8（无 BOM）TXT。本章仅正文；本卷／本书按当前顺序合并，以卷章显示名分隔，编号不写入正文。先保存并完整读取，坏 UTF-8、缺文件或未解决恢复记录会明确拒绝，不以空正文冒充成功；输出显示实际路径，重复导出不覆盖。
 - **单实例**：再开一份只会提示「已经在运行」，不会碰磁盘。
 
-M2 才做：查找替换、整库 zip 备份、专注模式、Inno Setup 安装包。
+M2 其余待办：查找替换、整库 zip 备份、专注模式。
+
+## Windows 安装包
+
+已接入 Inno Setup 每用户安装包：默认装到 `%LOCALAPPDATA%\Programs\不白写作`，不请求 UAC；可选桌面快捷方式，使用固定 AppId 覆盖升级。**卸载始终保留作品、设置与导出文件，不提供删除作品选项。** 已运行的程序需先保存并正常退出，安装器不会强杀。
+
+安装 Inno Setup 6.3+、Flutter 和 Visual Studio C++ 工具链后，在仓库根目录执行：
+
+```powershell
+dart run tool/build_windows_installer.dart
+```
+
+命令构建 Windows x64 Release、暂存完整程序及应用本地 VC++ 运行库，生成 `build/packages/*-setup.exe` 和同名 `.sha256`，拒绝覆盖旧交付。CI/Release 同时保留原 ZIP 分发方式；当前安装向导采用 Inno 默认英文，程序界面仍为中文。
+
+前置条件、指定编译器／运行库路径、复用现有 Release 和未签名 SmartScreen 注意事项见 [安装包说明](<installer/README.md>)。本机 Low integrity 构建文件应先写入工作区外的普通下载目录并校验哈希，不通过改 ACL 或管理员启动规避。
 
 ## 开发
 

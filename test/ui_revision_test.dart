@@ -5,12 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' show TextField;
 import 'package:no_white_writer/core/models.dart';
+import 'package:no_white_writer/core/chapter_display.dart';
 import 'package:no_white_writer/state/library_controller.dart';
 import 'package:no_white_writer/ui/book_details_dialog.dart';
 import 'package:no_white_writer/ui/editor_page.dart';
 
 import 'support/page_harness.dart';
 import 'support/app_harness.dart';
+import 'support/pointer.dart';
 
 Future<AppHarness> harness(WidgetTester tester, {double width = 1280}) async {
   tester.view.physicalSize = Size(width, 820);
@@ -97,7 +99,7 @@ void main() {
     await finishPage(tester, h);
   });
 
-  testWidgets('书架卡片在各宽度及列数临界处保持 220×300', (WidgetTester tester) async {
+  testWidgets('书架卡片在各宽度及列数临界处保持原220×293⅓的3:4外框', (WidgetTester tester) async {
     final AppHarness h = await harness(tester);
     await tester.runAsync(() => h.app.library.createBook('固定卡片'));
     await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
@@ -108,7 +110,20 @@ void main() {
       tester.view.physicalSize = Size(width, 820);
       await tester.pump(const Duration(milliseconds: 200));
       expect(cards, findsOneWidget);
-      expect(tester.getSize(cards), const Size(220, 300), reason: '窗口宽 $width');
+      expect(tester.getSize(cards).width, 220, reason: '窗口宽 $width');
+      expect(
+        tester.getSize(cards).height,
+        closeTo(220 * 4 / 3, .001),
+        reason: '窗口宽 $width，保持原可见封面而非带外部页脚的旧占位高度',
+      );
+      final cover = find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('book-cover-'),
+      );
+      final coverSize = tester.getSize(cover);
+      expect(coverSize.width / coverSize.height, closeTo(3 / 4, 0.001));
       expect(tester.takeException(), isNull);
     }
   });
@@ -182,11 +197,11 @@ void main() {
     expect(find.byType(EditorPage), findsOneWidget);
     expect(h.app.editor.book?.title, 'Z新作品');
     expect(h.app.editor.book?.notes, '备注一\n备注二');
-    // 新建卷入口已并入书名右侧菜单，不再单独占位。
-    expect(find.text('新建卷'), findsNothing);
+    // 新建卷按钮与书名菜单入口同时保留。
+    expect(find.byKey(const ValueKey('add-volume')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('book-menu-button')));
     await tester.pumpAndSettle();
-    expect(find.text('新建卷'), findsOneWidget);
+    expect(find.text('新建卷'), findsNWidgets(2));
     expect(find.text('自动章节序号设置'), findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
@@ -220,8 +235,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const ValueKey('open-chapter-pane')));
     await tester.pumpAndSettle();
-    // 新建卷入口已并入书名右侧菜单，窄屏仍可达。
-    expect(find.text('新建卷'), findsNothing);
+    // 窄屏目录中也有显式新建卷入口。
+    expect(find.byKey(const ValueKey('add-volume')), findsOneWidget);
     expect(find.byKey(const ValueKey('book-menu-button')), findsOneWidget);
     expect(find.text('作品信息'), findsNothing);
     await tester.tap(
@@ -277,8 +292,7 @@ void main() {
       }
 
       Future<void> tapVisible(Finder finder) async {
-        await tester.ensureVisible(finder);
-        await tester.tap(finder);
+        await tapWithMouse(tester, finder);
         // 当前章删除会显示持续动画的 ProgressRing；不能等待所有动画停止。
         await tester.pump(const Duration(milliseconds: 250));
       }
@@ -291,7 +305,7 @@ void main() {
 
       await openPane();
       await tapVisible(find.byKey(const ValueKey('book-menu-button')));
-      await tester.tap(find.text('新建卷'));
+      await tester.tap(find.text('新建卷').last);
       await tester.pump(const Duration(milliseconds: 250));
       await nameDialog('第二卷');
       await finishIo(
@@ -327,7 +341,8 @@ void main() {
             editorReady(tester),
       );
       final ChapterMeta created = h.app.editor.chapter!;
-      expect(created.title, '未命名章节');
+      expect(created.title, isEmpty);
+      expect(displayChapterTitle(book, second, created), '第二章');
       expect(h.app.library.expandedVolumesOf(book), isEmpty);
       await tapVisible(find.byKey(ValueKey('toggle-volume-${second.id}')));
       await tester.pumpAndSettle();

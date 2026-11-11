@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show Offset, PlatformDispatcher, Rect, Size;
 
+import 'package:file_selector/file_selector.dart' as file_selector;
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
@@ -11,13 +13,65 @@ import 'platform_services.dart';
 
 /// 桌面与移动端实现（PLAN.md §5.5）。窗口 API 只在 `_isDesktop` 分支调用，
 /// 移动端构建时不会执行任何 window_manager 逻辑。
-class IoPlatformServices implements PlatformServices {
+class IoPlatformServices with WindowListener implements PlatformServices {
   static const String appFolderName = '不白写作';
   static const Size minWindowSize = Size(900, 600);
   static const Size defaultWindowSize = Size(1280, 820);
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+
+  final _windowState = ValueNotifier(const DesktopWindowState());
+  bool _listening = false;
+
+  @override
+  bool get supportsCustomTitleBar => _isDesktop;
+  @override
+  ValueListenable<DesktopWindowState> get windowState => _windowState;
+
+  Future<void> _syncWindowState() async {
+    _windowState.value = DesktopWindowState(
+      maximized: await windowManager.isMaximized(),
+      fullScreen: await windowManager.isFullScreen(),
+    );
+  }
+
+  @override
+  void onWindowMaximize() => _syncWindowState();
+  @override
+  void onWindowUnmaximize() => _syncWindowState();
+  @override
+  void onWindowRestore() => _syncWindowState();
+  @override
+  void onWindowEnterFullScreen() => _syncWindowState();
+  @override
+  void onWindowLeaveFullScreen() => _syncWindowState();
+
+  @override
+  Future<void> minimizeWindow() async {
+    if (_isDesktop) await windowManager.minimize();
+  }
+
+  @override
+  Future<void> toggleWindowMaximized() async {
+    if (!_isDesktop || await windowManager.isFullScreen()) return;
+    if (await windowManager.isMaximized()) {
+      await windowManager.unmaximize();
+    } else {
+      await windowManager.maximize();
+    }
+    await _syncWindowState();
+  }
+
+  @override
+  Future<void> startWindowDrag() async {
+    if (_isDesktop) await windowManager.startDragging();
+  }
+
+  @override
+  Future<void> requestWindowClose() async {
+    if (_isDesktop) await windowManager.close();
+  }
 
   @override
   String get platformLabel => Platform.operatingSystem;
@@ -29,6 +83,14 @@ class IoPlatformServices implements PlatformServices {
   }) async {
     if (!_isDesktop) return;
     await windowManager.ensureInitialized();
+    if (!_listening) {
+      windowManager.addListener(this);
+      _listening = true;
+    }
+    await windowManager.setTitleBarStyle(
+      TitleBarStyle.hidden,
+      windowButtonVisibility: false,
+    );
     await windowManager.setMinimumSize(minWindowSize);
     final ({Size work, Offset origin}) area = await _workArea();
     final Size target = _initialSize(geometry, area.work);
@@ -42,6 +104,7 @@ class IoPlatformServices implements PlatformServices {
     if (maximized || (geometry?.maximized ?? false)) {
       await windowManager.maximize();
     }
+    await _syncWindowState();
     await windowManager.show();
     await windowManager.focus();
   }
@@ -216,6 +279,10 @@ class IoPlatformServices implements PlatformServices {
 
   @override
   bool get supportsExitIntercept => _isDesktop;
+
+  @override
+  Future<String?> selectDirectory({String? initialDirectory}) =>
+      file_selector.getDirectoryPath(initialDirectory: initialDirectory);
 
   @override
   Future<bool> revealInFileManager(String path) async {

@@ -291,3 +291,12 @@ SHA-256：`148E4281F9DD44BC9491B6B0D830F90C50A3B1BF45FC8617B96E8FD2A48625AB`。
 - 创建临时主题「紧凑布局验收」后打开重命名对话框，真实 UIA 测得输入区域为 **391×38 px**；对话框恢复紧凑布局，不再出现大段输入空白。实际改名为「紧凑布局已验收」，下拉框和管理列表同步更新。
 - 删除临时主题后回退「跟随系统」，最终 `settings.json` 的 `themeMode` 为 `system`、`customThemes` 为 `[]`。关闭设置返回空书架，再通过原生 X 正常退出；PID **37116** 已退出，既有 **6 个**进程保持未动，stderr 仅 Impeller OpenGL 后端说明，无 Dart 异常。
 
+## 15. UI review P0/P1 普通启动复验（2026-10-30）
+
+- 开启开发者模式后，当前 `flutter build windows --debug` 构建成功；但直接运行构建目录程序时，用户看到「已经在运行」。检查确认 Debug exe 与父目录仍继承 `Mandatory Label/Low Mandatory Level:(I)(NW)`；开发者模式只解决插件符号链接，不会改变该安全标签。
+- 当前 `InstanceLock.tryAcquire` 将文件访问失败与锁冲突都返回 `false`，因此 Low 进程无法写默认锁文件时会误显示已有实例。这次修正交付入口，不改业务逻辑、不删除锁文件、不降低数据目录权限，也不结束此前已有的六个无窗口进程。
+- 将当前完整 Debug 构建打包并解压到普通 Downloads 目录，全部 **22 个文件**的 SHA-256 与构建源一致。已解压入口：[启动程序](<C:/Users/userSigma/Downloads/no-white-writer-0.4.1-ui-review-debug-windows-x64-20261030-225158/no_white_writer.exe>)；完整包：[Debug ZIP](<../build/packages/no-white-writer-0.4.1-ui-review-debug-windows-x64-20261030-225158.zip>)。必须保留同目录 DLL 和 data，不再使用旧构建目录入口。
+- 无开发环境变量、使用默认 AppData 启动：测试 PID **27324**，令牌完整性 RID **8192（Medium）**，出现可见窗口「不白写作」，日志依次记录 `app.instance.acquired`、`app.instance.held`、`app.exit.requested` 与 `app.exit.accepted`，正常关闭退出码 **0**。stderr 仅有 Impeller 后端说明，无 Dart 异常。
+- 默认作品目录的全部 **8 个文件**启动前后 SHA-256 不变；构建源和解压产物也未改变。见[验证结果](<../build/ui-review-normal-startup-20261030-225158/result.json>)、[生命周期日志](<../build/ui-review-normal-startup-20261030-225158/lifecycle-log.txt>)与[验证脚本](<../build/package-and-verify-ui-review.py>)。
+- 本次仅验证普通启动、锁获取、正常退出与作品文件保护，不冒充原生目录选择器选择／取消或完整中文 IME 人工验收。
+

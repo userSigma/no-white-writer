@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:no_white_writer/core/storage/app_paths.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
 import 'package:no_white_writer/ui/settings/export_directory_section.dart';
 
@@ -27,83 +28,83 @@ class _DirectoryWriter extends AtomicFileWriter {
   }
 }
 
+Future<BuildContext> _mount(
+  WidgetTester tester,
+  ExportDirectoryDraft draft,
+  AppPaths paths,
+) async {
+  late BuildContext sectionContext;
+  await tester.pumpWidget(
+    FluentApp(
+      home: Builder(
+        builder: (context) {
+          sectionContext = context;
+          return ExportDirectorySection(draft: draft, paths: paths);
+        },
+      ),
+    ),
+  );
+  return sectionContext;
+}
+
 void main() {
-  testWidgets('目录分区独立挂载，IME 时保存与关闭均被守卫', (tester) async {
+  testWidgets('目录分区独立挂载，路径只读且取消选择保留设置', (tester) async {
     final h = await widgetHarness(tester);
+    String? initial;
     final draft = ExportDirectoryDraft(
       settings: h.app.settings,
+      paths: h.app.paths,
+      selectDirectory: ({initialDirectory}) async {
+        initial = initialDirectory;
+        return null;
+      },
       revealDirectory: (_) async => true,
       notice: (_, _) {},
     );
     addTearDown(draft.dispose);
-    late BuildContext sectionContext;
-    await tester.pumpWidget(
-      FluentApp(
-        home: Builder(
-          builder: (context) {
-            sectionContext = context;
-            return ListenableBuilder(
-              listenable: draft,
-              builder: (_, _) =>
-                  ExportDirectorySection(draft: draft, paths: h.app.paths),
-            );
-          },
-        ),
-      ),
+    final context = await _mount(tester, draft, h.app.paths);
+    final field = tester.widget<TextBox>(
+      find.byKey(const ValueKey('settings-export-path')),
     );
-    draft.path.value = const TextEditingValue(
-      text: '拼音候选',
-      selection: TextSelection.collapsed(offset: 4),
-      composing: TextRange(start: 0, end: 4),
-    );
-    await tester.pump();
-    final save = tester.widget<Button>(find.widgetWithText(Button, '保存'));
-    expect(save.onPressed, isNull);
-    expect(await draft.prepareClose(sectionContext), isFalse);
-    await draft.save(sectionContext);
-    expect(draft.path.value.composing, const TextRange(start: 0, end: 4));
+    expect(field.readOnly, isTrue);
+    expect(field.controller!.text, h.app.paths.exportRoot(null));
+    expect(find.text('保存'), findsNothing);
+    await tester.runAsync(() => draft.change(context));
+    expect(initial, h.app.paths.exportRoot(null));
     expect(h.app.settings.settings.exportDirectory, isNull);
+    expect(draft.path.text, h.app.paths.exportRoot(null));
+    expect(await tester.runAsync(() => draft.prepareClose(context)), isTrue);
     expect(find.byType(ContentDialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('独立目录草稿保存失败保留输入，重试提交同一草稿', (tester) async {
+  testWidgets('独立目录选择保存失败保留已选路径，重试提交同一选择', (tester) async {
     final writer = _DirectoryWriter()..fail = true;
     final h = await widgetHarness(tester, writer: writer);
     addTearDown(() => writer.fail = false);
     final draft = ExportDirectoryDraft(
       settings: h.app.settings,
+      paths: h.app.paths,
+      selectDirectory: ({initialDirectory}) async => 'picked-target',
       revealDirectory: (_) async => true,
       notice: (_, _) {},
     );
     addTearDown(draft.dispose);
-    late BuildContext sectionContext;
-    await tester.pumpWidget(
-      FluentApp(
-        home: Builder(
-          builder: (context) {
-            sectionContext = context;
-            return ExportDirectorySection(draft: draft, paths: h.app.paths);
-          },
-        ),
-      ),
-    );
-    draft.path.text = '  draft-target  ';
-    await tester.runAsync(() => draft.save(sectionContext));
-    expect(draft.path.text, '  draft-target  ');
-    expect(draft.dirty, isTrue);
-    expect(h.app.settings.settings.exportDirectory, isNull);
+    final context = await _mount(tester, draft, h.app.paths);
+    await tester.runAsync(() => draft.change(context));
+    expect(draft.path.text, h.app.paths.exportRoot('picked-target'));
+    expect(h.app.settings.settings.exportDirectory, 'picked-target');
     expect(h.app.settings.saveError, contains('directory draft fault'));
+    expect(await tester.runAsync(() => draft.prepareClose(context)), isFalse);
     writer.fail = false;
-    await tester.runAsync(() => draft.retry(sectionContext));
+    await tester.runAsync(() => draft.retry(context));
     expect(h.app.settings.saveError, isNull);
-    expect(draft.dirty, isFalse);
-    expect(h.app.settings.settings.exportDirectory, 'draft-target');
+    expect(h.app.settings.settings.exportDirectory, 'picked-target');
     final persisted = await tester.runAsync(h.app.settingsStore.load);
-    expect(persisted!.exportDirectory, 'draft-target');
+    expect(persisted!.exportDirectory, 'picked-target');
   });
 
-  testWidgets('目录保存未完成时拒绝关闭；保存结束后可正常关闭', (tester) async {
+  testWidgets('目录保存未完成时拦截关闭；保存结束后可正常关闭', (tester) async {
     final writer = _DirectoryWriter()..hold = true;
     final h = await widgetHarness(tester, writer: writer);
     addTearDown(() {
@@ -111,81 +112,67 @@ void main() {
     });
     final draft = ExportDirectoryDraft(
       settings: h.app.settings,
+      paths: h.app.paths,
+      selectDirectory: ({initialDirectory}) async => 'in-flight',
       revealDirectory: (_) async => true,
       notice: (_, _) {},
     );
     addTearDown(draft.dispose);
-    late BuildContext sectionContext;
-    await tester.pumpWidget(
-      FluentApp(
-        home: Builder(
-          builder: (context) {
-            sectionContext = context;
-            return ExportDirectorySection(draft: draft, paths: h.app.paths);
-          },
-        ),
-      ),
-    );
-    draft.path.text = 'in-flight';
+    final context = await _mount(tester, draft, h.app.paths);
     var finished = false;
-    unawaited(draft.save(sectionContext).then((_) => finished = true));
+    unawaited(draft.change(context).then((_) => finished = true));
     try {
       await finishIo(tester, until: () => writer.entered.isCompleted);
       expect(draft.working, isTrue);
-      expect(await draft.prepareClose(sectionContext), isFalse);
+      expect(await draft.prepareClose(context), isFalse);
       expect(finished, isFalse);
     } finally {
       writer.release.complete();
     }
     await finishIo(tester, until: () => finished);
     expect(draft.working, isFalse);
-    expect(
-      await tester.runAsync(() => draft.prepareClose(sectionContext)),
-      isTrue,
-    );
+    expect(await tester.runAsync(() => draft.prepareClose(context)), isTrue);
   });
 
-  testWidgets('目录丢弃确认只处理草稿，不关闭父级设置会话', (tester) async {
+  testWidgets('原生选择未完成时保留父会话，取消后恢复操作并支持恢复默认', (tester) async {
     final h = await widgetHarness(tester);
+    final selection = Completer<String?>();
     final draft = ExportDirectoryDraft(
       settings: h.app.settings,
+      paths: h.app.paths,
+      selectDirectory: ({initialDirectory}) => selection.future,
       revealDirectory: (_) async => true,
       notice: (_, _) {},
     );
     addTearDown(draft.dispose);
-    late BuildContext sectionContext;
-    await tester.pumpWidget(
-      FluentApp(
-        home: Builder(
-          builder: (context) {
-            sectionContext = context;
-            return ExportDirectorySection(draft: draft, paths: h.app.paths);
-          },
-        ),
-      ),
+    final context = await _mount(tester, draft, h.app.paths);
+    final picking = draft.change(context);
+    await tester.pump();
+    expect(draft.working, isTrue);
+    expect(await draft.prepareClose(context), isFalse);
+    expect(
+      tester
+          .widget<Button>(
+            find.byKey(const ValueKey('settings-change-export-path')),
+          )
+          .onPressed,
+      isNull,
     );
-    draft.path.text = 'unsaved';
-    bool? closed;
-    unawaited(
-      draft.prepareClose(sectionContext).then((value) => closed = value),
-    );
-    await tester.pumpAndSettle();
-    expect(draft.confirming, isTrue);
-    expect(await draft.prepareClose(sectionContext), isFalse);
-    await tester.tap(find.text('继续编辑'));
-    await tester.pumpAndSettle();
-    expect(closed, isFalse);
-    expect(draft.path.text, 'unsaved');
-    closed = null;
-    unawaited(
-      draft.prepareClose(sectionContext).then((value) => closed = value),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('丢弃修改'));
-    await finishIo(tester, until: () => closed != null);
-    expect(closed, isTrue);
-    expect(draft.dirty, isFalse);
+    selection.complete(null);
+    await picking;
+    await tester.pump();
+    expect(draft.working, isFalse);
     expect(find.byKey(const ValueKey('settings-export-path')), findsOneWidget);
+    h.app.settings.setExportDirectory('external-target');
+    await tester.runAsync(h.app.settings.flush);
+    expect(draft.path.text, h.app.paths.exportRoot('external-target'));
+    await tester.runAsync(() => draft.change(context, useDefault: true));
     expect(h.app.settings.settings.exportDirectory, isNull);
+    expect(draft.path.text, h.app.paths.exportRoot(null));
+    expect(
+      (await tester.runAsync(h.app.settingsStore.load))!.exportDirectory,
+      isNull,
+    );
+    expect(await tester.runAsync(() => draft.prepareClose(context)), isTrue);
   });
 }

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:ui' show Size;
 
+import 'package:flutter/foundation.dart';
+
 import 'platform_services_stub.dart'
     if (dart.library.io) 'platform_services_io.dart'
     as impl;
@@ -30,6 +32,13 @@ class WindowGeometry {
   };
 }
 
+/// 原生窗口事件的只读快照；UI 不推测系统快捷键引起的状态变化。
+class DesktopWindowState {
+  const DesktopWindowState({this.maximized = false, this.fullScreen = false});
+  final bool maximized;
+  final bool fullScreen;
+}
+
 /// 平台能力抽象：唯一允许 import `window_manager` / 调 `Process.run` 的边界（PLAN.md §5.1）。
 ///
 /// 与 PLAN §5.3 的差异（实现期修正）：`restoreGeometry()` / `saveGeometry()`
@@ -50,6 +59,15 @@ abstract interface class PlatformServices {
 
   Future<void> setWindowTitle(String title);
 
+  bool get supportsCustomTitleBar;
+  ValueListenable<DesktopWindowState> get windowState;
+  Future<void> minimizeWindow();
+  Future<void> toggleWindowMaximized();
+  Future<void> startWindowDrag();
+
+  /// 可取消的原生关闭请求，必须经过应用退出守卫；不是 quit/destroy。
+  Future<void> requestWindowClose();
+
   Future<void> setMinimumWindowSize(Size size);
 
   Future<WindowGeometry> currentGeometry();
@@ -57,6 +75,9 @@ abstract interface class PlatformServices {
   Future<void> setFullScreen(bool on);
 
   bool get supportsExitIntercept;
+
+  /// 打开原生目录选择器；用户取消时返回 null。
+  Future<String?> selectDirectory({String? initialDirectory});
 
   Future<bool> revealInFileManager(String path);
 
