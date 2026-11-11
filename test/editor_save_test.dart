@@ -54,6 +54,41 @@ Future<(BookSummary, BookIndex, Volume, ChapterMeta)> openFirst(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('排版设置立即更新当前正文并通过原保存链落盘，重开不重复缩进', () async {
+    final h = await createHarness();
+    addTearDown(h.dispose);
+    final (_, book, volume, chapter) = await openFirst(h);
+    final editor = h.app.editor;
+    editor.text.value = const TextEditingValue(
+      text: '甲\n乙',
+      selection: TextSelection.collapsed(offset: 3),
+    );
+    expect(await editor.flush(), isTrue);
+    h.app.settings.setAutoIndent(true);
+    h.app.settings.setBlankLineBetween(true);
+    expect(editor.text.text, '　　甲\n\n　　乙');
+    expect(editor.isDirty, isTrue);
+    expect(await editor.flush(), isTrue);
+    expect(
+      await h.app.chapterStore.readText(book.id, volume.id, chapter.id),
+      '　　甲\n\n　　乙',
+    );
+    expect(
+      await editor.open(inBook: book, inVolume: volume, inChapter: chapter),
+      isTrue,
+    );
+    expect(editor.text.text, '　　甲\n\n　　乙');
+    expect(editor.isDirty, isFalse);
+    h.app.settings.setAutoIndent(false);
+    h.app.settings.setBlankLineBetween(false);
+    expect(editor.text.text, '甲\n乙');
+    expect(await editor.flush(), isTrue);
+    expect(
+      await h.app.chapterStore.readText(book.id, volume.id, chapter.id),
+      '甲\n乙',
+    );
+  });
+
   test('撤回到成功保存的正文会立即恢复干净状态', () async {
     final AppHarness h = await createHarness();
     addTearDown(h.dispose);
@@ -181,10 +216,7 @@ void main() {
       composing: TextRange(start: 0, end: 4),
     );
     await h.app.editor.saveNow();
-    expect(
-      (await h.app.bookStore.load(summary)).allChapters.first.title,
-      '未命名章节',
-    );
+    expect((await h.app.bookStore.load(summary)).allChapters.first.title, '');
     expect(h.app.editor.isDirty, isTrue);
     expect(await h.app.editor.flushForExit(), isTrue);
     expect(

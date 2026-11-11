@@ -254,6 +254,7 @@ void main() {
     final book = await library.openBook(summary);
     final volume = book.volumes.single;
     final chapter = volume.chapters.single;
+    final initialTitle = chapter.title;
 
     writer.holdFirstBookWrite = true;
     final active = library.structure.renameVolume(book, volume, '已受理卷名');
@@ -278,7 +279,7 @@ void main() {
     expect(library.exporting, isFalse);
     final saved = await h.app.bookStore.load(summary);
     expect(saved.volumes.single.title, '已受理卷名');
-    expect(saved.allChapters.single.title, '未命名章节');
+    expect(saved.allChapters.single.title, initialTitle);
   });
 
   test('书库控制器关闭后拒绝写入和导出预约', () async {

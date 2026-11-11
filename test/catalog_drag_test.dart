@@ -12,6 +12,7 @@ import 'package:no_white_writer/ui/theme/tokens.dart';
 
 import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 import 'support/fake_platform.dart';
 
 Future<void> drag(WidgetTester t, Finder from, Finder to) async {
@@ -72,7 +73,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('open-chapter-pane')));
         await tester.pumpAndSettle();
       }
-      await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+      await tapWithMouse(
+        tester,
+        find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+      );
       await tester.pumpAndSettle();
       expect(find.text('移动'), findsOneWidget);
       expect(find.text('上移章'), findsNothing);
@@ -114,7 +118,7 @@ void main() {
       expect(h.app.editor.text.text, initialText);
       expect(
         (h.app.platform as FakePlatformServices).lastTitle,
-        contains('第001章 ${chapter.title}'),
+        contains('第001章 ${chapter.title}'.trimRight()),
       );
       expect(tester.takeException(), isNull);
       expect(h.app.library.expandedVolumesOf(book), {source.id});
@@ -194,7 +198,10 @@ void main() {
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
-    await tester.tap(find.byKey(ValueKey('chapter-menu-${second.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('chapter-menu-${second.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('移动'));
     await finishIo(
@@ -249,7 +256,7 @@ void main() {
     );
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(ValueKey('volume-menu-${b.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${b.id}')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('移动'));
     await finishIo(
@@ -294,7 +301,10 @@ void main() {
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
-    await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('移动'));
     await finishIo(
@@ -364,7 +374,10 @@ void main() {
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
-    await tester.tap(find.byKey(ValueKey('chapter-menu-${chapter.id}')));
+    await tapWithMouse(
+      tester,
+      find.byKey(ValueKey('chapter-menu-${chapter.id}')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('移动'));
     await finishIo(

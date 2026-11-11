@@ -22,6 +22,7 @@ import 'state/library_controller.dart';
 import 'state/settings_controller.dart';
 import 'ui/editor_page.dart';
 import 'ui/shelf_page.dart';
+import 'ui/window_title_bar.dart';
 import 'ui/theme/tokens.dart';
 
 /// 进程入口：装配平台层、日志、单实例锁、存储与控制器（PLAN.md §5.2）。
@@ -47,7 +48,7 @@ Future<void> main() async {
   if (!await lock.tryAcquire()) {
     await platform.initialize();
     await platform.setWindowTitle('不白写作已在运行');
-    runApp(const _AlreadyRunningApp());
+    runApp(_AlreadyRunningApp(platform: platform));
     return;
   }
 
@@ -237,41 +238,61 @@ Future<void> main() async {
 
 /// 第二个实例：不抢锁、不写数据，只提示切回已有的窗口。
 class _AlreadyRunningApp extends StatelessWidget {
-  const _AlreadyRunningApp();
+  const _AlreadyRunningApp({required this.platform});
+  final PlatformServices platform;
 
   @override
   Widget build(BuildContext context) {
     return FluentApp(
       title: '不白写作已在运行',
+      debugShowCheckedModeBanner: false,
       theme: buildFluentTheme(AppThemeData.light),
       darkTheme: buildFluentTheme(AppThemeData.dark),
       themeMode: ThemeMode.system,
       locale: const Locale('zh'),
       localizationsDelegates: FluentLocalizations.localizationsDelegates,
       supportedLocales: FluentLocalizations.supportedLocales,
-      home: ScaffoldPage(
-        // Builder：这里才是 FluentApp 的主题之下，能取到 FluentTheme。
-        content: Builder(
-          builder: (BuildContext context) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  const Icon(FluentIcons.info, size: 40),
-                  const SizedBox(height: 16),
-                  const Text('不白写作已经在运行了', style: TextStyle(fontSize: 18)),
-                  const SizedBox(height: 8),
-                  Text(
-                    '请从任务栏切回刚才的窗口；这一份实例不会再动磁盘上的作品。',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: mutedTextColor(context)),
+      builder: (context, child) => WindowFrame(
+        platform: platform,
+        child: child ?? const SizedBox.shrink(),
+      ),
+      home: Column(
+        children: [
+          WindowTitleBar(
+            platform: platform,
+            leading: const WindowBrand(title: '不白写作已在运行'),
+            draggableLeading: true,
+          ),
+          Expanded(
+            child: ScaffoldPage(
+              // Builder：这里才是 FluentApp 的主题之下，能取到 FluentTheme。
+              content: Builder(
+                builder: (BuildContext context) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        const Icon(FluentIcons.info, size: 40),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '不白写作已经在运行了',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '请从任务栏切回刚才的窗口；这一份实例不会再动磁盘上的作品。',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: mutedTextColor(context)),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

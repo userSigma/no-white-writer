@@ -49,7 +49,9 @@ class BookStructureService {
     }
     final chapter = ChapterMeta(
       id: newId(),
-      title: title?.trim().isNotEmpty == true ? title!.trim() : '未命名章节',
+      title: title?.trim().isNotEmpty == true
+          ? title!.trim()
+          : (rule != null ? '' : '未命名章节'),
       order: target.chapters.length,
     );
     target.chapters.add(chapter);

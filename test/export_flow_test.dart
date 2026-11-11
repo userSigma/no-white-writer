@@ -40,6 +40,11 @@ class _ExportWriter extends AtomicFileWriter {
 Future<(BookIndex, Volume, ChapterMeta)> _open(AppHarness h) async {
   final summary = await h.app.library.createBook('导出保护');
   final book = await h.app.library.openBook(summary);
+  // 此组覆盖无全局编号的导出；新书默认汉字编号另有独立回归。
+  await h.app.library.structure.setGlobalNumbering(
+    book,
+    const ChapterNumbering(),
+  );
   final volume = book.volumes.first;
   final chapter = volume.chapters.first;
   await h.app.editor.open(inBook: book, inVolume: volume, inChapter: chapter);

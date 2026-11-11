@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/core/chapter_numbering.dart';
+import 'package:no_white_writer/core/chapter_display.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
 
@@ -43,9 +44,10 @@ void main() {
     return (h, summary, book, volume, chapter);
   }
 
-  test('新章默认未命名，非法编号/溢出在创建文件前阻止', () async {
+  test('新章默认汉字编号，非法编号/溢出在创建文件前阻止', () async {
     final (h, summary, book, volume, chapter) = await setup();
-    expect(chapter.title, '未命名章节');
+    expect(chapter.title, '');
+    expect(displayChapterTitle(book, volume, chapter), '第一章');
     await h.app.library.structure.setNumbering(
       book,
       volume,

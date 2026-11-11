@@ -1,10 +1,26 @@
 import 'dart:io';
 import 'dart:ui' show Size;
 
+import 'package:flutter/foundation.dart';
+
 import 'platform_services.dart';
 
 /// 无 `dart:io` 平台（web）的占位实现；本项目 v1 不构建 web，仅保证条件导入可编译。
 class StubPlatformServices implements PlatformServices {
+  final _windowState = ValueNotifier(const DesktopWindowState());
+  @override
+  bool get supportsCustomTitleBar => false;
+  @override
+  ValueListenable<DesktopWindowState> get windowState => _windowState;
+  @override
+  Future<void> minimizeWindow() async {}
+  @override
+  Future<void> toggleWindowMaximized() async {}
+  @override
+  Future<void> startWindowDrag() async {}
+  @override
+  Future<void> requestWindowClose() async {}
+
   @override
   String get platformLabel => 'unsupported';
 
@@ -35,6 +51,9 @@ class StubPlatformServices implements PlatformServices {
 
   @override
   bool get supportsExitIntercept => false;
+
+  @override
+  Future<String?> selectDirectory({String? initialDirectory}) async => null;
 
   @override
   Future<bool> revealInFileManager(String path) async => false;

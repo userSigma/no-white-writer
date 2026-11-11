@@ -7,9 +7,10 @@ import 'package:no_white_writer/ui/theme/tokens.dart';
 
 import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
+import 'support/pointer.dart';
 
 void main() {
-  testWidgets('+ 直接创建一次，默认标题选中，折叠偏好不被新建改变', (tester) async {
+  testWidgets('+ 直接创建一次，空原标题保持可编辑，折叠偏好不被新建改变', (tester) async {
     final h = await widgetHarness(tester);
     final book = (await tester.runAsync(() async {
       final s = await h.app.library.createBook('目录');
@@ -31,17 +32,17 @@ void main() {
     await tester.pumpAndSettle();
     final plus = find.byKey(ValueKey('add-chapter-${volume.id}'));
     expect(plus, findsOneWidget);
-    await tester.tap(plus);
-    await tester.tap(plus);
+    await tapWithMouse(tester, plus);
+    await tapWithMouse(tester, plus);
     await finishIo(
       tester,
       until: () => book.allChapters.length == 2 && editorReady(tester),
     );
     expect(book.allChapters.length, 2);
-    expect(h.app.editor.title.text, '未命名章节');
+    expect(h.app.editor.title.text, '');
     expect(
       h.app.editor.title.selection,
-      const TextSelection(baseOffset: 0, extentOffset: 5),
+      const TextSelection.collapsed(offset: 0),
     );
     expect(find.byKey(const ValueKey('name-input')), findsNothing);
     expect(h.app.library.expandedVolumesOf(book), {volume.id});
@@ -63,7 +64,7 @@ void main() {
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
-    await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${v.id}')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
@@ -87,7 +88,7 @@ void main() {
     );
     expect(v.title, '新卷名中');
     expect(h.app.library.expandedVolumesOf(book), isEmpty);
-    await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${v.id}')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
@@ -157,7 +158,7 @@ void main() {
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
-    await tester.tap(find.byKey(ValueKey('volume-menu-${v.id}')));
+    await tapWithMouse(tester, find.byKey(ValueKey('volume-menu-${v.id}')));
     await tester.pumpAndSettle();
     // 卷菜单不再单独提供「卷设置」，编号入口收敛为「章节编号」子菜单。
     expect(find.text('卷设置'), findsNothing);

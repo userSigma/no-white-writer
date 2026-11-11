@@ -22,6 +22,8 @@ void main() {
       ),
     );
 
+    await tester.tap(find.byKey(const ValueKey('settings-theme-manage')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('新建自定义主题…'));
     await tester.pumpAndSettle();
     expect(modalChanges, [true]);

@@ -9,7 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # 运行时依赖：path_provider / window_manager / fluent_ui 三个主依赖；
+  # 运行时依赖：path_provider / window_manager / fluent_ui；
+  # file_selector 提供原生导出目录选择器；
   # material_ui 是 fluent_ui 的传递依赖，用于裸 TextField；
   # screen_retriever 是 window_manager 的传递依赖，用于拿工作区做 R18 收敛。
   path_provider: ^2.1.6
@@ -17,11 +18,13 @@ dependencies:
   fluent_ui: ^4.17.0
   material_ui: ^1.8.0
   screen_retriever: ^0.2.2
+  file_selector: ^1.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  crypto: ^3.0.7 # Build-time installer SHA-256; already present in the lockfile.
 
 flutter:
   uses-material-design: true
