@@ -11,14 +11,15 @@ import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
 import 'package:no_white_writer/core/storage/book_store.dart';
 import 'package:no_white_writer/core/storage/chapter_store.dart';
 import 'package:no_white_writer/core/storage/export_service.dart';
+import 'package:no_white_writer/core/storage/export_snapshot_store.dart';
 import 'package:no_white_writer/core/storage/instance_lock.dart';
 import 'package:no_white_writer/core/storage/library_store.dart';
 import 'package:no_white_writer/state/editor_controller.dart';
+import 'package:no_white_writer/state/export_controller.dart';
 import 'package:no_white_writer/state/library_controller.dart';
 import 'package:no_white_writer/state/settings_controller.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
-import 'package:no_white_writer/ui/shelf_page.dart';
 
+import 'support/page_harness.dart';
 import 'support/fake_platform.dart';
 
 class _Harness {
@@ -74,6 +75,13 @@ Future<_Harness> _buildHarness() async {
     library: library,
     editor: editor,
     i18n: i18n,
+    exporter: ExportController(
+      reader: ExportSnapshotStore(paths),
+      editor: editor,
+      library: library,
+      settings: settings,
+      service: exports,
+    ),
     instanceLock: InstanceLock('${dir.path}/instance.lock'),
   );
   return _Harness(app, dir);
@@ -96,7 +104,7 @@ void main() {
     });
     await tester.runAsync(() => h.app.library.createBook('验收书'));
 
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -141,7 +149,7 @@ void main() {
 
     await tester.pumpWidget(
       FluentApp(
-        home: EditorPage(
+        home: editorPage(
           app: h.app,
           book: book,
           volume: volume,

@@ -5,12 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' show TextField;
 import 'package:no_white_writer/core/models.dart';
-import 'package:no_white_writer/core/chapter_numbering.dart';
+import 'package:no_white_writer/core/chapter_display.dart';
 import 'package:no_white_writer/state/library_controller.dart';
 import 'package:no_white_writer/ui/book_details_dialog.dart';
 import 'package:no_white_writer/ui/editor_page.dart';
-import 'package:no_white_writer/ui/shelf_page.dart';
 
+import 'support/page_harness.dart';
 import 'support/app_harness.dart';
 import 'support/pointer.dart';
 
@@ -79,7 +79,7 @@ void main() {
     final BookSummary summary = (await tester.runAsync(
       () => h.app.library.createBook('键盘验收'),
     ))!;
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.tap(find.text(summary.title).first);
     await finishIo(tester, until: () => editorReady(tester));
     for (final String key in <String>['chapter-title', 'chapter-body']) {
@@ -102,7 +102,7 @@ void main() {
   testWidgets('书架卡片在各宽度及列数临界处保持原220×293⅓的3:4外框', (WidgetTester tester) async {
     final AppHarness h = await harness(tester);
     await tester.runAsync(() => h.app.library.createBook('固定卡片'));
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     final Finder cards = find.byWidgetPredicate(
       (Widget w) => w.runtimeType.toString() == '_BookCard',
     );
@@ -130,7 +130,7 @@ void main() {
 
   testWidgets('新建表单单行50字、备注固定三行，回车只移焦', (WidgetTester tester) async {
     final AppHarness h = await harness(tester);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.tap(find.text('新建').first);
     await tester.pumpAndSettle();
     final Finder name = find.byKey(const ValueKey('book-title-input'));
@@ -178,7 +178,7 @@ void main() {
     final AppHarness h = await harness(tester);
     await tester.runAsync(() => h.app.library.createBook('A旧作品'));
     h.app.library.setSort(LibrarySort.title);
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.tap(find.text('新建'));
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -214,7 +214,7 @@ void main() {
     final BookSummary summary = (await tester.runAsync(
       () => h.app.library.createBook('直接写作'),
     ))!;
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.tap(find.text(summary.title).first);
     await finishIo(tester, until: () => editorReady(tester));
     expect(find.byType(EditorPage), findsOneWidget);
@@ -269,7 +269,7 @@ void main() {
       final ChapterMeta first = book.allChapters.first;
       await tester.pumpWidget(
         FluentApp(
-          home: EditorPage(app: h.app, book: book),
+          home: editorPage(app: h.app, book: book),
         ),
       );
       await finishIo(tester, until: () => editorReady(tester));
@@ -467,7 +467,7 @@ void main() {
     final BookSummary summary = (await tester.runAsync(
       () => h.app.library.createBook('记忆卷'),
     ))!;
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.tap(find.text(summary.title).first);
     await finishIo(tester, until: () => editorReady(tester));
     final String volumeId = h.app.editor.volume!.id;

@@ -12,6 +12,7 @@ import 'package:no_white_writer/core/storage/export_snapshot_store.dart';
 import 'package:no_white_writer/core/storage/instance_lock.dart';
 import 'package:no_white_writer/core/storage/library_store.dart';
 import 'package:no_white_writer/state/editor_controller.dart';
+import 'package:no_white_writer/state/export_controller.dart';
 import 'package:no_white_writer/state/library_controller.dart';
 import 'package:no_white_writer/state/settings_controller.dart';
 
@@ -75,11 +76,17 @@ Future<AppHarness> createHarness({
       bookStore: books,
       chapterStore: chapters,
       exports: exports,
-      exportReader: ExportSnapshotStore(paths, readBytes: exportReadBytes),
       settings: settings,
       library: library,
       editor: editor,
       i18n: i18n,
+      exporter: ExportController(
+        reader: ExportSnapshotStore(paths, readBytes: exportReadBytes),
+        editor: editor,
+        library: library,
+        settings: settings,
+        service: exports,
+      ),
       instanceLock: InstanceLock('${root.path}/instance.lock'),
     ),
     root,

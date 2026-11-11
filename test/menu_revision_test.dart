@@ -5,10 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/state/library_controller.dart';
 import 'package:no_white_writer/ui/context_menu.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
-import 'package:no_white_writer/ui/shelf_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
 import 'support/pointer.dart';
 
@@ -113,7 +112,7 @@ void main() {
         await tester.pumpWidget(
           FluentApp(
             theme: buildFluentTheme(AppThemeData.builtinFor(brightness)),
-            home: ShelfPage(app: h.app),
+            home: shelfPage(app: h.app),
           ),
         );
         await tester.pumpAndSettle();
@@ -163,7 +162,7 @@ void main() {
         await tester.pumpWidget(
           FluentApp(
             theme: buildFluentTheme(AppThemeData.builtinFor(brightness)),
-            home: EditorPage(app: h.app, book: book),
+            home: editorPage(app: h.app, book: book),
           ),
         );
         await finishIo(tester, until: () => editorReady(tester));
@@ -315,7 +314,7 @@ void main() {
       await h.app.library.createBook('A-其他书');
       return target;
     }))!;
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.pumpAndSettle();
     await tapWithMouse(tester, find.byKey(ValueKey('book-menu-${target.id}')));
     await tester.pumpAndSettle();

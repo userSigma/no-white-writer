@@ -5,10 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/app.dart';
 import 'package:no_white_writer/core/models.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
-import 'package:no_white_writer/ui/shelf_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
 
 double menuOpacity(WidgetTester tester, Finder button) {
@@ -104,7 +103,7 @@ void main() {
     final summary = (await tester.runAsync(
       () => h.app.library.createBook('菜单作品'),
     ))!;
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     final button = find.byKey(ValueKey('book-menu-${summary.id}'));
     expect(tester.getSize(button), const Size(28, 28));
     expect(menuOpacity(tester, button), 0);
@@ -130,7 +129,7 @@ void main() {
     final summary = (await tester.runAsync(
       () => h.app.library.createBook('窄屏菜单'),
     ))!;
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.pumpAndSettle();
     final button = find.byKey(ValueKey('book-menu-${summary.id}'));
     expect(tester.getSize(button), const Size(28, 28));
@@ -151,7 +150,7 @@ void main() {
     }))!;
     await tester.pumpWidget(
       FluentApp(
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));

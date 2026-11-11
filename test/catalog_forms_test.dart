@@ -6,10 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/chapter_numbering.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/ui/book_details_dialog.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
 import 'support/pointer.dart';
 
@@ -78,7 +78,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -145,7 +145,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -191,7 +191,7 @@ void main() {
       await tester.pumpWidget(
         FluentApp(
           theme: buildFluentTheme(AppThemeData.light),
-          home: EditorPage(app: h.app, book: book),
+          home: editorPage(app: h.app, book: book),
         ),
       );
       await finishIo(tester, until: () => editorReady(tester));
@@ -233,7 +233,7 @@ void main() {
       await tester.pumpWidget(
         FluentApp(
           theme: buildFluentTheme(AppThemeData.light),
-          home: EditorPage(app: h.app, book: book),
+          home: editorPage(app: h.app, book: book),
         ),
       );
       await finishIo(tester, until: () => editorReady(tester));
@@ -285,7 +285,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -365,7 +365,7 @@ void main() {
       await tester.pumpWidget(
         FluentApp(
           theme: buildFluentTheme(AppThemeData.light),
-          home: EditorPage(app: h.app, book: book),
+          home: editorPage(app: h.app, book: book),
         ),
       );
       await finishIo(tester, until: () => editorReady(tester));
@@ -437,7 +437,7 @@ void main() {
     await tester.pumpWidget(
       FluentApp(
         theme: buildFluentTheme(AppThemeData.light),
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:fluent_ui/fluent_ui.dart';
 
+import '../core/chapter_display.dart';
 import '../core/chapter_numbering.dart';
 import '../core/i18n/i18n.dart';
 import '../core/models.dart';

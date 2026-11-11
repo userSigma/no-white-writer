@@ -1,11 +1,11 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/app.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
 import 'package:no_white_writer/core/platform/platform_services.dart';
 
 import 'support/fake_platform.dart';
 
+import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
 
 void main() {
@@ -125,7 +125,7 @@ void main() {
       await tester.pumpWidget(
         NoWhiteWriterApp(
           app: h.app,
-          home: EditorPage(app: h.app, book: book),
+          home: editorPage(app: h.app, book: book),
         ),
       );
       await finishIo(tester, until: () => editorReady(tester));

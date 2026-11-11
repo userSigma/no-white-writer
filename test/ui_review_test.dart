@@ -2,9 +2,8 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:no_white_writer/ui/editor_page.dart';
-import 'package:no_white_writer/ui/shelf_page.dart';
 
+import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
 
 void main() {
@@ -18,7 +17,7 @@ void main() {
       }))!;
       await tester.pumpWidget(
         FluentApp(
-          home: EditorPage(app: h.app, book: book),
+          home: editorPage(app: h.app, book: book),
         ),
       );
       await finishIo(tester, until: () => editorReady(tester));
@@ -50,7 +49,7 @@ void main() {
     }))!;
     await tester.pumpWidget(
       FluentApp(
-        home: EditorPage(app: h.app, book: book),
+        home: editorPage(app: h.app, book: book),
       ),
     );
     await finishIo(tester, until: () => editorReady(tester));
@@ -117,7 +116,7 @@ void main() {
       await h.app.library.createBook('Alpha');
       await h.app.library.createBook('Beta');
     });
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('shelf-grid-view')), findsNothing);
     expect(find.byKey(const ValueKey('shelf-list-view')), findsNothing);
@@ -140,7 +139,7 @@ void main() {
     'new-book dashed tile exists on empty shelf and opens creation dialog',
     (tester) async {
       final h = await widgetHarness(tester);
-      await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+      await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
       await tester.tap(find.byKey(const ValueKey('shelf-new-book-tile')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('book-title-input')), findsOneWidget);

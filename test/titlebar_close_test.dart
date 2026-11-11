@@ -85,7 +85,7 @@ void main() {
       return book;
     }))!;
     var allow = false;
-    final guard = h.app.registerUiGuard(() async => allow);
+    final guard = h.app.uiGuards.register(() async => allow);
     final platform = h.app.platform as FakePlatformServices;
     AppExitResponse? response;
     platform.onRequestClose = () async {
@@ -115,7 +115,7 @@ void main() {
       '关闭前必须保存的正文',
     );
     expect(platform.quitCalled, isFalse);
-    h.app.removeUiGuard(guard);
+    h.app.uiGuards.remove(guard);
     await finishWidget(tester, h);
   });
 

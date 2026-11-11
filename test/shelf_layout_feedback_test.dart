@@ -7,9 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/app.dart';
 import 'package:no_white_writer/ui/format.dart';
-import 'package:no_white_writer/ui/shelf_page.dart';
 import 'package:no_white_writer/ui/theme/tokens.dart';
 
+import 'support/page_harness.dart';
 import 'support/widget_harness.dart';
 
 Future<List<Color>> pixels(
@@ -96,7 +96,7 @@ void main() {
       await h.app.library.createBook('Alpha');
       await h.app.library.createBook('Beta');
     });
-    await tester.pumpWidget(FluentApp(home: ShelfPage(app: h.app)));
+    await tester.pumpWidget(FluentApp(home: shelfPage(app: h.app)));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('shelf-book-grid')), findsOneWidget);
     expect(find.byKey(const ValueKey('shelf-book-list')), findsNothing);

@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show TextEditingValue, TextSelection;
 import 'package:flutter/widgets.dart' show TextEditingController;
 
-import '../core/chapter_numbering.dart';
+import '../core/chapter_display.dart';
 import '../core/logging/app_logger.dart';
 import '../core/models.dart';
 import '../core/storage/book_store.dart';

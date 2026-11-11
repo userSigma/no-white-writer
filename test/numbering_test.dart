@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_white_writer/core/models.dart';
+import 'package:no_white_writer/core/chapter_display.dart';
 import 'package:no_white_writer/core/chapter_numbering.dart';
 
 BookIndex _book(List<Volume> volumes) =>

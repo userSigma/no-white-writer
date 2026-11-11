@@ -1,7 +1,7 @@
 name: no_white_writer
 description: "不白写作 — 一个安静的纯文本写作工具（Flutter / Windows 优先，代码适配 macOS、Windows ARM、Linux、Android）。"
 publish_to: 'none'
-version: 0.4.1+5
+version: 0.5.0
 
 environment:
   sdk: ^3.13.5

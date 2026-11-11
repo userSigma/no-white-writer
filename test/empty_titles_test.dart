@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:no_white_writer/core/chapter_display.dart';
 import 'package:no_white_writer/core/chapter_numbering.dart';
 import 'package:no_white_writer/core/models.dart';
 import 'package:no_white_writer/core/storage/atomic_file_writer.dart';
